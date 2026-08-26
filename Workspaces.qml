@@ -4,6 +4,7 @@ import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
 import Quickshell.Hyprland
+import Quickshell.Wayland
 import qs.Ui
 import qs.Commons
 
@@ -549,6 +550,112 @@ Panel {
   }
 
   // ---------------------------------------------------------------------
+  // Hover preview
+  //
+  // Hovering a workspace shows what is actually on it. Capture goes through
+  // ScreencopyView pointed at each window's `wayland` handle — a
+  // HyprlandToplevel is not itself a capture source, it only carries a
+  // reference to one.
+  //
+  // Deliberately single-shot (`live: false` + captureFrame) rather than a live
+  // feed: a live capture per window is far too expensive for something that
+  // appears whenever the pointer crosses the bar.
+  // ---------------------------------------------------------------------
+  readonly property bool hoverPreviewEnabled: String(root.effSetting("hoverPreview", true)) !== "false"
+  property int hoverPreviewId: 0
+  property int pendingPreviewId: 0
+  property Item hoverAnchor: null
+  property Item pendingPreviewAnchor: null
+
+  // The preview box is sized here, not derived from the Column's implicit
+  // size: a Rectangle with an explicit `width` still has implicitWidth 0, so
+  // the Column under-reported and the card clipped the miniature.
+  readonly property int previewBoxWidth: Style.space(300)
+  readonly property int previewBoxHeight: {
+    var m = root.previewMonitor
+    var ratio = (m && m.width > 0) ? m.height / m.width : 0.625
+    return Math.max(40, Math.round(root.previewBoxWidth * ratio))
+  }
+
+  // Geometry of the monitor the previewed workspace lives on. An empty or
+  // pinned workspace may not be assigned to one, so fall back to the focused
+  // monitor rather than giving up.
+  readonly property var previewMonitor: {
+    if (root.hoverPreviewId <= 0) return null
+    var ws = root.workspaceById(root.hoverPreviewId)
+    if (ws && ws.monitor && ws.monitor.lastIpcObject) return ws.monitor.lastIpcObject
+    var focusedMon = Hyprland.focusedMonitor
+    return (focusedMon && focusedMon.lastIpcObject) ? focusedMon.lastIpcObject : null
+  }
+
+  // Real window geometry, straight off Hyprland, so the preview is a scaled
+  // map of the workspace rather than a row of equal-sized tiles. Tiled windows
+  // are emitted first so floating ones stack above them, matching what you'd
+  // actually see.
+  readonly property var previewWindows: {
+    if (root.hoverPreviewId <= 0) return []
+    var ws = root.workspaceById(root.hoverPreviewId)
+    if (!ws) return []
+
+    var all = ws.toplevels.values
+    var out = []
+    for (var i = 0; i < all.length; i++) {
+      var o = all[i].lastIpcObject
+      if (!o || !o.at || !o.size) continue
+      if (o.hidden || o.mapped === false) continue
+      if (o.size[0] <= 0 || o.size[1] <= 0) continue
+      out.push({
+        toplevel: all[i],
+        ax: o.at[0], ay: o.at[1],
+        aw: o.size[0], ah: o.size[1],
+        floating: !!o.floating
+      })
+    }
+    out.sort(function(a, b) { return (a.floating ? 1 : 0) - (b.floating ? 1 : 0) })
+    // One capture per window; cap it so a pathological workspace can't stall
+    // the bar.
+    return out.slice(0, 12)
+  }
+
+  function requestPreview(id, anchor) {
+    if (!root.hoverPreviewEnabled) return
+    // The editor owns the bar's single popout slot; a preview would evict it.
+    if (root.opened) return
+    if (!root.hasWindows(id)) return
+    root.pendingPreviewId = id
+    root.pendingPreviewAnchor = anchor
+    previewDelay.restart()
+  }
+
+  // Only clears state belonging to `id`, so sweeping from one workspace to the
+  // next doesn't cancel the arriving one's pending timer.
+  function cancelPreview(id) {
+    if (root.pendingPreviewId === id) { previewDelay.stop(); root.pendingPreviewId = 0 }
+    if (root.hoverPreviewId === id) root.hoverPreviewId = 0
+  }
+
+  function hidePreview() {
+    previewDelay.stop()
+    root.pendingPreviewId = 0
+    root.hoverPreviewId = 0
+  }
+
+  onOpenedChanged: if (root.opened) root.hidePreview()
+
+  Timer {
+    id: previewDelay
+    interval: 450
+    onTriggered: {
+      if (root.opened || root.pendingPreviewId <= 0) return
+      root.hoverAnchor = root.pendingPreviewAnchor
+      root.hoverPreviewId = root.pendingPreviewId
+      // The text tooltip is redundant once the preview is up, and they overlap.
+      if (root.hoverAnchor && typeof root.hoverAnchor.hideOwnTooltip === "function")
+        root.hoverAnchor.hideOwnTooltip()
+    }
+  }
+
+  // ---------------------------------------------------------------------
   // Bar row
   // ---------------------------------------------------------------------
   readonly property real trailingGap: root.vertical ? 0 : Style.spaceReal(1.5)
@@ -609,6 +716,10 @@ Panel {
           else root.focusWorkspace(wsButton.modelData)
         }
         onWheelMoved: function(delta) { root.handleWheel(delta) }
+        onTooltipHoveredChanged: {
+          if (wsButton.tooltipHovered) root.requestPreview(wsButton.modelData, wsButton)
+          else root.cancelPreview(wsButton.modelData)
+        }
       }
     }
 
@@ -630,6 +741,104 @@ Panel {
         else root.addWorkspace()
       }
       onWheelMoved: function(delta) { root.handleWheel(delta) }
+    }
+  }
+
+  // PopupCard.close() assigns `open` directly unless its owner has a close(),
+  // which would overwrite the binding below for good. The editor can't be that
+  // owner — its close() would tear down the wrong thing — so the preview gets
+  // its own.
+  QtObject {
+    id: hoverOwner
+    function close() { root.hidePreview() }
+  }
+
+  PopupCard {
+    id: hoverCard
+    anchorItem: root.hoverAnchor ? root.hoverAnchor : grid
+    owner: hoverOwner
+    bar: root.bar
+    triggerMode: "hover"
+    open: root.hoverPreviewId > 0 && root.previewMonitor !== null && root.previewWindows.length > 0
+    // contentWidth/Height are the card's OUTER size. fittedContentHeight adds
+    // the padding+border inset for you; fittedContentWidth does not, so the
+    // horizontal one has to be added by hand or the card is exactly one
+    // inset too narrow and clips the right edge of its own content.
+    readonly property real horizontalContentInset: hoverCard.padding * 2
+      + Border.left(hoverCard.borderSpec) + Border.right(hoverCard.borderSpec)
+
+    contentWidth: hoverCard.fittedContentWidth(
+      root.previewBoxWidth + hoverCard.horizontalContentInset)
+    contentHeight: hoverCard.fittedContentHeight(
+      root.previewBoxHeight + Style.space(6) + previewCaption.implicitHeight)
+
+    Column {
+      id: previewColumn
+      anchors.centerIn: parent
+      spacing: Style.space(6)
+
+      // Stands in for the monitor. Everything inside is positioned in real
+      // Hyprland coordinates scaled by `sx`, so relative sizes and positions
+      // survive.
+      Rectangle {
+        id: screenRect
+        width: root.previewBoxWidth
+        height: root.previewBoxHeight
+        implicitWidth: width
+        implicitHeight: height
+        radius: Style.cornerRadius
+        color: Qt.alpha(Color.popups.text, 0.05)
+        border.width: 1
+        border.color: Qt.alpha(Color.popups.text, 0.14)
+        clip: true
+
+        readonly property real sx: root.previewMonitor && root.previewMonitor.width > 0
+          ? width / root.previewMonitor.width : 0
+        readonly property real originX: root.previewMonitor ? root.previewMonitor.x : 0
+        readonly property real originY: root.previewMonitor ? root.previewMonitor.y : 0
+
+        Repeater {
+          model: root.previewWindows
+
+          Rectangle {
+            id: winRect
+            required property var modelData
+
+            x: Math.round((winRect.modelData.ax - screenRect.originX) * screenRect.sx)
+            y: Math.round((winRect.modelData.ay - screenRect.originY) * screenRect.sx)
+            width: Math.max(3, Math.round(winRect.modelData.aw * screenRect.sx))
+            height: Math.max(3, Math.round(winRect.modelData.ah * screenRect.sx))
+
+            color: Color.popups.background
+            border.width: 1
+            border.color: Qt.alpha(Color.popups.text, winRect.modelData.floating ? 0.45 : 0.22)
+            radius: 2
+            clip: true
+
+            ScreencopyView {
+              id: shot
+              anchors.fill: parent
+              captureSource: winRect.modelData.toplevel ? winRect.modelData.toplevel.wayland : null
+              live: false
+              paintCursor: false
+            }
+          }
+        }
+      }
+
+      Text {
+        id: previewCaption
+        width: screenRect.width
+        elide: Text.ElideRight
+        text: {
+          var label = root.displayFor(root.hoverPreviewId)
+          var n = root.previewWindows.length
+          return label.name + "  ·  " + n + (n === 1 ? " window" : " windows")
+        }
+        color: Qt.darker(Color.popups.text, 1.3)
+        font.family: root.bar ? root.bar.fontFamily : Style.font.family
+        font.pixelSize: Style.font.caption
+      }
     }
   }
 

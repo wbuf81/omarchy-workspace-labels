@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "wes.workspaces",
   "name": "Workspace Labels",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "author": "Wes",
   "license": "MIT",
   "description": "Named workspaces with per-workspace icons, an inline icon picker, and a + to add or remove workspaces. Right-click to edit.",
@@ -67,7 +67,8 @@
         3,
         4,
         5
-      ]
+      ],
+      "hoverPreview": true
     },
     "schema": [
       {
@@ -75,6 +76,13 @@
         "type": "object",
         "label": "Workspace labels",
         "description": "Map of workspace number -> {icon, name}. Edited via right-click on the widget, or `omarchy bar set wes.workspaces labels '<json>' --json`."
+      },
+      {
+        "key": "hoverPreview",
+        "type": "boolean",
+        "label": "Hover previews",
+        "description": "Hovering a workspace shows thumbnails of the windows on it. Captured once per hover via Hyprland toplevel export, not a live feed. Suppressed while the editor panel is open.",
+        "defaultValue": true
       },
       {
         "key": "pinned",

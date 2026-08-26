@@ -23,12 +23,26 @@ The editor isn't a bolted-on popup. It's built on `Ui.Panel` + `Ui.KeyboardPanel
 so it takes real keyboard focus, scrolls and clamps inside the screen, and hands
 the popout slot over correctly when you open another bar widget.
 
+- **Hover to see what's on it** — a scaled map of the workspace, windows drawn at their real positions and sizes.
 - **Editable in place** — right-click any workspace, rename it, pick an icon.
 - **Icon picker built in** — 49 render-verified Nerd Font glyphs, searchable, or paste your own.
 - **Add and remove workspaces** — `+` pins the next free slot; `×` gives it back.
 - **Fully keyboard driven** — `j`/`k`, `Enter`, `i`, `a`, `x`, `Esc`.
 - **Unbounded** — any workspace Hyprland reports gets a button, named or not.
 - **Saves instantly** — writes straight to `shell.json`; nothing to reload.
+
+<p align="center">
+  <img src="docs/preview.png" alt="Hover preview of a workspace" width="480">
+</p>
+
+Hovering a workspace draws a miniature of it — each window captured through
+Hyprland's toplevel export and placed at its true position and size, so a
+tiled pair reads as a tiled pair. It works for workspaces you aren't currently
+on, which is the whole point: the compositor never renders those, so there is
+no single screenshot to grab and the preview has to be assembled per window.
+
+Captures are taken once per hover (`live: false`), not streamed — a live feed
+per window every time the pointer crosses the bar would be far too expensive.
 
 <p align="center">
   <img src="docs/picker.png" alt="The inline icon picker" width="480">
@@ -48,6 +62,7 @@ JetBrainsMono Nerd Font.
 
 | Action | Result |
 | --- | --- |
+| Hover a workspace | Preview the windows on it (~0.5s delay) |
 | Left-click a workspace | Switch to it |
 | Right-click a workspace | Open the editor on that workspace's row |
 | Scroll over the bar | Previous / next workspace |
@@ -78,6 +93,7 @@ Stored inline in `~/.config/omarchy/shell.json` under this widget's layout entry
 | Key | Type | Meaning |
 | --- | --- | --- |
 | `labels` | object | `{"1": {"icon": "…", "name": "Code"}}` |
+| `hoverPreview` | boolean | Hover previews. Default `true`; set `false` to turn them off. |
 | `pinned` | array | Workspace numbers kept in the bar even when empty. Managed by `+` and `×`. |
 | `minWorkspaces` | integer | Legacy. Only read while `pinned` is unset, where it pins `1..N`. |
 
