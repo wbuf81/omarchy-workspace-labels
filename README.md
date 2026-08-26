@@ -98,7 +98,12 @@ omarchy-shell wes.workspaces add
 omarchy-shell wes.workspaces remove 6
 omarchy-shell wes.workspaces next           # cycle workspaces
 omarchy-shell wes.workspaces prev
+omarchy-shell wes.workspaces reset          # back to built-in defaults
 ```
+
+On a multi-monitor setup the panel opens on one bar instance, not all of them
+— matching how the built-in wifi, clock and volume panels behave. Right-click
+works on whichever monitor you click.
 
 ## Keybinding
 
@@ -117,8 +122,10 @@ o.bind("SUPER + ALT + W", "Workspace labels", "omarchy-shell wes.workspaces togg
   `Local plugin changed, reloading` on save, but that does **not** re-render
   the widget — the log line is emitted by the watcher, not by a successful
   reload.
-- Vertical bar positions and multi-monitor are implemented but untested on
-  hardware; only a single horizontal top bar has been verified.
+- Verified on a single horizontal top bar and on a vertical (left) bar, where
+  the widget renders icon-only in a column and the panel anchors beside it.
+  Multi-monitor is implemented to the same convention as the built-in panels
+  but has not been exercised on a second screen.
 
 ## License
 

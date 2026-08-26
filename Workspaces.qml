@@ -994,6 +994,7 @@ Panel {
     function openFor(id: string): void { root.openFor(parseInt(id, 10) || 0, false) }
     function picker(id: string): void { root.openPicker(parseInt(id, 10) || 0); root.controller.show() }
     function add(): void { root.addWorkspace() }
+    function reset(): void { root.resetLabels() }
     function next(): void { root.cycleWorkspace(1) }
     function prev(): void { root.cycleWorkspace(-1) }
     function remove(id: string): void { root.removeWorkspace(parseInt(id, 10) || 0) }
