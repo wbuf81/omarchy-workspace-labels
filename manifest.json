@@ -1,0 +1,99 @@
+{
+  "schemaVersion": 1,
+  "id": "wes.workspaces",
+  "name": "Workspace Labels",
+  "version": "2.0.0",
+  "author": "Wes",
+  "license": "MIT",
+  "description": "Named workspaces with per-workspace icons, an inline icon picker, and a + to add or remove workspaces. Right-click to edit.",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "Workspaces.qml"
+  },
+  "keywords": [
+    "workspaces",
+    "workspace",
+    "labels",
+    "names",
+    "icons",
+    "rename",
+    "hyprland",
+    "indicator",
+    "pager",
+    "workspace names",
+    "workspace icons"
+  ],
+  "barWidget": {
+    "displayName": "Workspace Labels",
+    "description": "Named workspaces with icons. Right-click any workspace to open the editor panel, or press + to add one.",
+    "category": "Compositor",
+    "allowMultiple": false,
+    "defaultSection": "left",
+    "aliases": [
+      "workspaces",
+      "workspace labels",
+      "labels",
+      "workspace names",
+      "pager"
+    ],
+    "defaults": {
+      "labels": {
+        "1": {
+          "icon": "\udb81\udea9",
+          "name": "Code"
+        },
+        "2": {
+          "icon": "\uf015",
+          "name": "Home"
+        },
+        "3": {
+          "icon": "\uf0ac",
+          "name": "Web"
+        },
+        "4": {
+          "icon": "\uf099",
+          "name": "X"
+        },
+        "5": {
+          "icon": "\uf0e0",
+          "name": "Gmail"
+        }
+      },
+      "pinned": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    "schema": [
+      {
+        "key": "labels",
+        "type": "object",
+        "label": "Workspace labels",
+        "description": "Map of workspace number -> {icon, name}. Edited via right-click on the widget, or `omarchy bar set wes.workspaces labels '<json>' --json`."
+      },
+      {
+        "key": "pinned",
+        "type": "array",
+        "label": "Pinned workspaces",
+        "description": "Workspace numbers kept in the bar even when empty. Managed by the + button and the per-row remove in the editor. Workspaces that actually exist always show regardless. If unset, the legacy `minWorkspaces` setting seeds this as 1..N."
+      },
+      {
+        "key": "minWorkspaces",
+        "type": "integer",
+        "label": "Always-visible workspaces (legacy)",
+        "description": "Superseded by `pinned`, which is written the first time you use + or remove. Only consulted while `pinned` is unset, where it pins 1..N.",
+        "min": 0,
+        "max": 20,
+        "defaultValue": 5
+      }
+    ]
+  },
+  "omarchy": {
+    "clonedFrom": "omarchy.workspaces"
+  }
+}
