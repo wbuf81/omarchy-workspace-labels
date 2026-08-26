@@ -20,13 +20,13 @@ import qs.Commons
 //
 //   right-click any workspace  ->  editor, focused on that workspace's row
 //   click "+"                  ->  pin, focus and name the next free workspace
-//   omarchy bar set wes.workspaces labels '{"1":{"icon":"","name":"Code"}}' --json
+//   omarchy bar set io.github.wbuf81.workspace-labels labels '{"1":{"icon":"","name":"Code"}}' --json
 //
 // The focused workspace keeps its own icon and gets its name underlined.
 Panel {
   id: root
-  moduleName: "wes.workspaces"
-  ipcTarget: "wes.workspaces"
+  moduleName: "io.github.wbuf81.workspace-labels"
+  ipcTarget: "io.github.wbuf81.workspace-labels"
   // We own the IpcHandler so the target can carry openFor/add/remove on top
   // of the open/close/toggle set Panel would otherwise register.
   manageIpc: false
@@ -1431,12 +1431,12 @@ Panel {
   }
 
   // Lets the editor be driven from a keybinding or a terminal:
-  //   omarchy-shell wes.workspaces toggleEditor
-  //   omarchy-shell wes.workspaces openFor 3
-  //   omarchy-shell wes.workspaces add
-  //   omarchy-shell wes.workspaces remove 6
+  //   omarchy-shell io.github.wbuf81.workspace-labels toggleEditor
+  //   omarchy-shell io.github.wbuf81.workspace-labels openFor 3
+  //   omarchy-shell io.github.wbuf81.workspace-labels add
+  //   omarchy-shell io.github.wbuf81.workspace-labels remove 6
   IpcHandler {
-    target: "wes.workspaces"
+    target: "io.github.wbuf81.workspace-labels"
 
     function toggleEditor(): void { root.toggle() }
     function toggle(): void { root.toggle() }

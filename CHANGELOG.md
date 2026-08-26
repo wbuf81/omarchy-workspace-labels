@@ -1,5 +1,20 @@
 # Changelog
 
+## 3.0.0
+
+**Breaking: the plugin id changed** from `wes.workspaces` to
+`io.github.wbuf81.workspace-labels`, to meet the Omarchy marketplace's
+requirement that ids be globally unique and permanent. Done before listing,
+since the id cannot change afterwards.
+
+If you installed the earlier id, the settings under your old `shell.json`
+layout entry (labels, pinned) need to move to the new one, and any keybinding
+or script calling `omarchy-shell wes.workspaces ...` needs the new name.
+
+- README now documents removal as well as installation.
+- LICENSE and README document third-party components: none are bundled; glyphs
+  and app icons come from the font and icon themes already on the machine.
+
 ## 2.3.0
 
 - **App icons.** A workspace icon can now be a real application icon instead of

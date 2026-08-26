@@ -19,3 +19,21 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+
+---
+
+Third-party components
+----------------------
+
+This plugin bundles no third-party code or assets.
+
+At runtime it uses only APIs provided by Omarchy's quickshell configuration
+(qs.Ui, qs.Commons) and by Quickshell itself. Nerd Font glyphs are rendered
+from the font the bar is already configured with, and application icons are
+read from the desktop entries and icon themes already installed on the
+machine. Neither is redistributed with this plugin.
+
+Application logos appearing in the screenshots under docs/ are trademarks of
+their respective owners and are reproduced only to illustrate the plugin's
+behaviour.

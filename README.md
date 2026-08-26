@@ -62,7 +62,7 @@ window's class against `StartupWMClass`, so a workspace running Brave offers
 the Brave icon in one click.
 
 ```sh
-omarchy bar set wes.workspaces labels '{"3":{"icon":"app:brave-desktop","name":"Brave"}}' --json
+omarchy bar set io.github.wbuf81.workspace-labels labels '{"3":{"icon":"app:brave-desktop","name":"Brave"}}' --json
 ```
 
 **No desktop entry for the thing on that workspace?** A site you keep open as a
@@ -85,11 +85,23 @@ would rather not install anything; type it into the picker's glyph field.
 
 ```sh
 omarchy plugin add https://github.com/wbuf81/omarchy-workspace-labels.git --enable
-omarchy bar move wes.workspaces --section left
+omarchy bar move io.github.wbuf81.workspace-labels --section left
 ```
 
 Requires Hyprland and a Nerd Font — the icon presets are verified against
 JetBrainsMono Nerd Font.
+
+## Remove
+
+```sh
+omarchy plugin disable io.github.wbuf81.workspace-labels      # take it off the bar, keep it installed
+omarchy plugin remove io.github.wbuf81.workspace-labels       # uninstall it
+omarchy plugin enable omarchy.workspaces   # put the stock indicators back
+```
+
+Your labels and pinned list live in `~/.config/omarchy/shell.json` under this
+widget's layout entry and go with it. Nothing is written anywhere else — no
+files outside that entry, no services, no state directories.
 
 ## Use
 
@@ -133,23 +145,23 @@ Stored inline in `~/.config/omarchy/shell.json` under this widget's layout entry
 Scriptable, and picked up live:
 
 ```sh
-omarchy bar set wes.workspaces labels '{"1":{"icon":"","name":"Code"}}' --json
-omarchy bar set wes.workspaces pinned '[1,2,3,4,5]' --json
+omarchy bar set io.github.wbuf81.workspace-labels labels '{"1":{"icon":"","name":"Code"}}' --json
+omarchy bar set io.github.wbuf81.workspace-labels pinned '[1,2,3,4,5]' --json
 ```
 
 ## IPC
 
 ```sh
-omarchy-shell wes.workspaces toggleEditor   # also: toggle / open / close
-omarchy-shell wes.workspaces openFor 3      # open targeting workspace 3
-omarchy-shell wes.workspaces picker 3       # jump to its icon picker
-omarchy-shell wes.workspaces add
-omarchy-shell wes.workspaces remove 6
-omarchy-shell wes.workspaces next           # cycle workspaces
-omarchy-shell wes.workspaces prev
-omarchy-shell wes.workspaces reset          # back to built-in defaults
-omarchy-shell wes.workspaces preview 3      # peek at a workspace without hovering
-omarchy-shell wes.workspaces unpreview
+omarchy-shell io.github.wbuf81.workspace-labels toggleEditor   # also: toggle / open / close
+omarchy-shell io.github.wbuf81.workspace-labels openFor 3      # open targeting workspace 3
+omarchy-shell io.github.wbuf81.workspace-labels picker 3       # jump to its icon picker
+omarchy-shell io.github.wbuf81.workspace-labels add
+omarchy-shell io.github.wbuf81.workspace-labels remove 6
+omarchy-shell io.github.wbuf81.workspace-labels next           # cycle workspaces
+omarchy-shell io.github.wbuf81.workspace-labels prev
+omarchy-shell io.github.wbuf81.workspace-labels reset          # back to built-in defaults
+omarchy-shell io.github.wbuf81.workspace-labels preview 3      # peek at a workspace without hovering
+omarchy-shell io.github.wbuf81.workspace-labels unpreview
 ```
 
 On a multi-monitor setup the panel opens on one bar instance, not all of them
@@ -161,7 +173,7 @@ works on whichever monitor you click.
 In `~/.config/hypr/bindings.lua`:
 
 ```lua
-o.bind("SUPER + ALT + W", "Workspace labels", "omarchy-shell wes.workspaces toggleEditor")
+o.bind("SUPER + ALT + W", "Workspace labels", "omarchy-shell io.github.wbuf81.workspace-labels toggleEditor")
 ```
 
 `next` / `prev` work here too if you'd rather bind them than scroll.
@@ -177,6 +189,17 @@ o.bind("SUPER + ALT + W", "Workspace labels", "omarchy-shell wes.workspaces togg
   the widget renders icon-only in a column and the panel anchors beside it.
   Multi-monitor is implemented to the same convention as the built-in panels
   but has not been exercised on a second screen.
+
+## Third-party
+
+No third-party code is bundled. At runtime the plugin uses only APIs provided by
+Omarchy's quickshell configuration (`qs.Ui`, `qs.Commons`) and Quickshell itself.
+
+Icon glyphs come from whichever Nerd Font the bar is configured to use, and
+application icons are read from the desktop entries and icon themes already
+installed on the machine — neither is redistributed here. Application logos
+visible in the screenshots are trademarks of their respective owners and appear
+only to illustrate what the plugin does.
 
 ## License
 

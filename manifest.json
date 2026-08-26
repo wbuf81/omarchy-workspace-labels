@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "id": "wes.workspaces",
+  "id": "io.github.wbuf81.workspace-labels",
   "name": "Workspace Labels",
-  "version": "2.3.0",
+  "version": "3.0.0",
   "author": "Wes",
   "license": "MIT",
   "description": "Named workspaces with per-workspace icons \u2014 Nerd Font glyphs or real app icons \u2014 hover previews, and a + to add or remove workspaces.",
@@ -75,7 +75,7 @@
         "key": "labels",
         "type": "object",
         "label": "Workspace labels",
-        "description": "Map of workspace number -> {icon, name}. `icon` is a literal glyph, or \"app:<icon-name>\" to use an installed application's icon (e.g. \"app:brave-desktop\"). Edited by right-clicking the widget, or `omarchy bar set wes.workspaces labels '<json>' --json`."
+        "description": "Map of workspace number -> {icon, name}. `icon` is a literal glyph, or \"app:<icon-name>\" to use an installed application's icon (e.g. \"app:brave-desktop\"). Edited by right-clicking the widget, or `omarchy bar set io.github.wbuf81.workspace-labels labels '<json>' --json`."
       },
       {
         "key": "hoverPreview",
