@@ -1204,6 +1204,13 @@ Panel {
     function picker(id: string): void { root.openPicker(parseInt(id, 10) || 0); root.controller.show() }
     function add(): void { root.addWorkspace() }
     function reset(): void { root.resetLabels() }
+    function preview(id: string): void {
+      var n = parseInt(id, 10) || 0
+      if (n <= 0 || !root.hasWindows(n)) { root.hidePreview(); return }
+      root.hoverAnchor = grid
+      root.hoverPreviewId = n
+    }
+    function unpreview(): void { root.hidePreview() }
     function next(): void { root.cycleWorkspace(1) }
     function prev(): void { root.cycleWorkspace(-1) }
     function remove(id: string): void { root.removeWorkspace(parseInt(id, 10) || 0) }

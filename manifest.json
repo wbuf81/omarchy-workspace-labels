@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "wes.workspaces",
   "name": "Workspace Labels",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "author": "Wes",
   "license": "MIT",
   "description": "Named workspaces with per-workspace icons, an inline icon picker, and a + to add or remove workspaces. Right-click to edit.",

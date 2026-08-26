@@ -115,6 +115,8 @@ omarchy-shell wes.workspaces remove 6
 omarchy-shell wes.workspaces next           # cycle workspaces
 omarchy-shell wes.workspaces prev
 omarchy-shell wes.workspaces reset          # back to built-in defaults
+omarchy-shell wes.workspaces preview 3      # peek at a workspace without hovering
+omarchy-shell wes.workspaces unpreview
 ```
 
 On a multi-monitor setup the panel opens on one bar instance, not all of them
