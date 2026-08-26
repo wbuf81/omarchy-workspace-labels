@@ -1,5 +1,21 @@
 # Changelog
 
+## 2.3.0
+
+- **App icons.** A workspace icon can now be a real application icon instead of
+  a Nerd Font glyph, stored as `app:<icon-name>` and resolved through the
+  shell's AppLibrary. Existing configs are untouched — no glyph starts with
+  `app:`.
+- The picker gained an **APPS** section listing every installed app, and an
+  **ON THIS WORKSPACE** row that matches each running window's class against
+  the desktop entry's `StartupWMClass`. That indirection matters: Brave's class
+  is `brave-browser` but its icon is `brave-desktop`, so a naive class lookup
+  returns the generic fallback.
+- The bar button now builds its own content row rather than using
+  WidgetButton's text label, since an app icon is an Image. As a side effect
+  labels render as PlainText, so the rich-text escaping is gone entirely and a
+  name like `R&D` or `<3` is safe by construction rather than by escaping.
+
 ## 2.2.0
 
 - `preview` / `unpreview` IPC verbs, so a workspace can be peeked at from a

@@ -25,7 +25,8 @@ the popout slot over correctly when you open another bar widget.
 
 - **Hover to see what's on it** — a scaled map of the workspace, windows drawn at their real positions and sizes.
 - **Editable in place** — right-click any workspace, rename it, pick an icon.
-- **Icon picker built in** — 49 render-verified Nerd Font glyphs, searchable, or paste your own.
+- **Real app icons** — use the actual Brave lion or Spotify mark, not an approximation. Apps running on the workspace you're editing are offered first.
+- **Icon picker built in** — 49 render-verified Nerd Font glyphs plus every installed app, searchable, or paste your own.
 - **Add and remove workspaces** — `+` pins the next free slot; `×` gives it back.
 - **Fully keyboard driven** — `j`/`k`, `Enter`, `i`, `a`, `x`, `Esc`.
 - **Unbounded** — any workspace Hyprland reports gets a button, named or not.
@@ -47,6 +48,22 @@ per window every time the pointer crosses the bar would be far too expensive.
 <p align="center">
   <img src="docs/picker.png" alt="The inline icon picker" width="480">
 </p>
+
+### App icons
+
+The picker lists every installed application alongside the glyphs. Pick one and
+the workspace shows that app's real icon.
+
+An app icon is stored as `app:<icon-name>` — the name from the desktop entry's
+`Icon=` field, **not** the window class. Those often differ: Brave's window
+class is `brave-browser` but its icon is `brave-desktop`. The picker's
+**ON THIS WORKSPACE** row resolves that for you by matching each running
+window's class against `StartupWMClass`, so a workspace running Brave offers
+the Brave icon in one click.
+
+```sh
+omarchy bar set wes.workspaces labels '{"3":{"icon":"app:brave-desktop","name":"Brave"}}' --json
+```
 
 ## Install
 
@@ -92,7 +109,7 @@ Stored inline in `~/.config/omarchy/shell.json` under this widget's layout entry
 
 | Key | Type | Meaning |
 | --- | --- | --- |
-| `labels` | object | `{"1": {"icon": "…", "name": "Code"}}` |
+| `labels` | object | `{"1": {"icon": "…", "name": "Code"}}`. `icon` is a glyph, or `app:<icon-name>` for an application icon. |
 | `hoverPreview` | boolean | Hover previews. Default `true`; set `false` to turn them off. |
 | `pinned` | array | Workspace numbers kept in the bar even when empty. Managed by `+` and `×`. |
 | `minWorkspaces` | integer | Legacy. Only read while `pinned` is unset, where it pins `1..N`. |

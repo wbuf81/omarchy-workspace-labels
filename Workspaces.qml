@@ -220,10 +220,74 @@ Panel {
     return label
   }
 
-  // Bar button text is rich text (see the <span> note below), so anything the
-  // user typed has to be escaped or a name like "R&D" or "<3" renders as markup.
-  function escapeMarkup(text) {
-    return String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+  // ---------------------------------------------------------------------
+  // App icons
+  //
+  // A stored icon is normally a literal glyph. The "app:" prefix instead names
+  // a desktop-entry icon, resolved through the shell's AppLibrary. Existing
+  // configs are unaffected: no Nerd Font glyph starts with "app:".
+  //
+  // Note the icon name is NOT the window class. Brave's class is
+  // "brave-browser" but its icon is "brave-desktop"; the two are linked only
+  // by StartupWMClass in the .desktop file, which is why a naive
+  // iconSource(class) lookup returns the generic fallback.
+  // ---------------------------------------------------------------------
+  readonly property string appIconPrefix: "app:"
+  readonly property var appLibrary: (root.bar && root.bar.shell) ? root.bar.shell.appLibrary : null
+
+  function isAppIcon(icon) {
+    return String(icon || "").indexOf(root.appIconPrefix) === 0
+  }
+
+  function appIconName(icon) {
+    return String(icon || "").substring(root.appIconPrefix.length)
+  }
+
+  function appIconSource(name) {
+    return root.appLibrary ? root.appLibrary.iconSource(name) : ""
+  }
+
+  // Every installed app, unwrapped from AppLibrary's {entry, score, key, name}
+  // search wrappers, and only those that actually declare an icon.
+  function appEntries(query) {
+    if (!root.appLibrary) return []
+    var rows = root.appLibrary.sortedEntries(String(query || ""))
+    var out = []
+    for (var i = 0; i < rows.length; i++) {
+      var e = rows[i] && rows[i].entry ? rows[i].entry : null
+      if (!e || !e.icon) continue
+      out.push({ icon: String(e.icon), name: String(e.name || ""), wmClass: String(e.startupClass || "") })
+    }
+    return out
+  }
+
+  // Apps currently running on a workspace, matched class -> StartupWMClass so
+  // the workspace running Brave can be given the actual Brave icon in a click.
+  function appsOnWorkspace(id) {
+    var ws = root.workspaceById(id)
+    if (!ws || !root.appLibrary) return []
+
+    var classes = []
+    var tl = ws.toplevels.values
+    for (var i = 0; i < tl.length; i++) {
+      var o = tl[i].lastIpcObject
+      var cls = o ? String(o["class"] || "") : ""
+      if (cls && classes.indexOf(cls) === -1) classes.push(cls)
+    }
+    if (classes.length === 0) return []
+
+    var all = root.appEntries("")
+    var out = []
+    for (var c = 0; c < classes.length; c++) {
+      var want = classes[c].toLowerCase()
+      for (var a = 0; a < all.length; a++) {
+        var entry = all[a]
+        var sc = entry.wmClass.toLowerCase()
+        if (!sc || sc !== want) continue
+        if (out.filter(function(x) { return x.icon === entry.icon }).length === 0) out.push(entry)
+      }
+    }
+    return out
   }
 
   // Snapshot of the effective labels, so editing one row can't drop the others.
@@ -541,6 +605,12 @@ Panel {
         || String(preset.description).toLowerCase().indexOf(q) !== -1
   }
 
+  // Apps matching the search box, and the ones actually running on the
+  // workspace being edited (offered first — that is the one-click path to
+  // "this is my Brave workspace, give it the Brave icon").
+  readonly property var filteredApps: root.showPicker ? root.appEntries(root.iconQuery) : []
+  readonly property var workspaceApps: root.showPicker ? root.appsOnWorkspace(root.pickerFor) : []
+
   readonly property var filteredIcons: {
     var out = []
     for (var i = 0; i < root.iconPresets.length; i++) {
@@ -687,30 +757,78 @@ Panel {
         // Named wsLabel, not label: WidgetButton already has an internal
         // `label` item and a plain `label` property would shadow it.
         readonly property var wsLabel: root.displayFor(modelData)
+        readonly property bool usesAppIcon: root.isAppIcon(wsLabel.icon)
 
         bar: root.bar
 
-        // Always wrapped in <span> so Text.AutoText resolves to rich text every
-        // time - otherwise the icon/label gap would shift when the <u> appears,
-        // since rich text collapses plain consecutive spaces.
-        text: {
-          var glyph = root.escapeMarkup(wsButton.wsLabel.icon)
-          var name = root.escapeMarkup(wsButton.wsLabel.name)
+        // The built-in label is switched off and the content built here
+        // instead, because an app icon is an Image and WidgetButton only
+        // paints text. Doing it this way also drops the old rich-text
+        // <span>/<u> approach, so user-typed names no longer need escaping —
+        // they render as PlainText and a name like "R&D" or "<3" is safe.
+        labelVisible: false
+        hasVisualContent: true
+        text: ""
 
-          if (root.vertical) return "<span>" + (glyph !== "" ? glyph : name) + "</span>"
-          if (name === "") return "<span>" + glyph + "</span>"
+        fixedWidth: root.vertical
+          ? root.barSize
+          : Math.round(buttonContent.implicitWidth + scaledHorizontalMargin * 2)
+        fixedHeight: root.barSize
 
-          var shown = wsButton.focused ? "<u>" + name + "</u>" : name
-          if (glyph === "") return "<span>" + shown + "</span>"
-          return "<span>" + glyph + "&nbsp;&nbsp;" + shown + "</span>"
+        Row {
+          id: buttonContent
+          anchors.centerIn: parent
+          spacing: Style.space(6)
+
+          Image {
+            id: appIconImage
+            visible: wsButton.usesAppIcon
+            width: visible ? Style.space(16) : 0
+            height: width
+            anchors.verticalCenter: parent.verticalCenter
+            fillMode: Image.PreserveAspectFit
+            // Decode at physical pixels, or PNG icons come out upscaled and
+            // blurry on HiDPI.
+            sourceSize.width: Math.max(1, width * Screen.devicePixelRatio)
+            sourceSize.height: Math.max(1, height * Screen.devicePixelRatio)
+            source: wsButton.usesAppIcon
+              ? root.appIconSource(root.appIconName(wsButton.wsLabel.icon)) : ""
+            asynchronous: true
+          }
+
+          Text {
+            id: glyphText
+            visible: !wsButton.usesAppIcon && wsButton.wsLabel.icon !== ""
+            text: wsButton.wsLabel.icon
+            textFormat: Text.PlainText
+            anchors.verticalCenter: parent.verticalCenter
+            color: wsButton.foreground
+            font.family: wsButton.fontFamily
+            font.pixelSize: wsButton.fontSize
+            renderType: Text.NativeRendering
+          }
+
+          Text {
+            id: nameText
+            // On a vertical bar only the icon fits; fall back to the name
+            // when there is no icon at all, so the button is never blank.
+            visible: wsButton.wsLabel.name !== ""
+              && (!root.vertical || (!wsButton.usesAppIcon && wsButton.wsLabel.icon === ""))
+            text: wsButton.wsLabel.name
+            textFormat: Text.PlainText
+            font.underline: wsButton.focused
+            anchors.verticalCenter: parent.verticalCenter
+            color: wsButton.foreground
+            font.family: wsButton.fontFamily
+            font.pixelSize: wsButton.fontSize
+            renderType: Text.NativeRendering
+          }
         }
 
         tooltipText: wsButton.wsLabel.name + "  —  right-click to edit"
         opacity: wsButton.occupied || wsButton.focused ? 1 : 0.5
         horizontalMargin: 6
         verticalPadding: 6
-        fixedWidth: root.vertical ? root.barSize : -1
-        fixedHeight: root.barSize
         onPressed: function(button) {
           if (button === Qt.RightButton || button === Qt.MiddleButton) root.openFor(wsButton.modelData, false)
           else root.focusWorkspace(wsButton.modelData)
@@ -894,16 +1012,43 @@ Panel {
             width: parent.width
             implicitHeight: Math.max(heroIcon.implicitHeight, heroLabels.implicitHeight)
 
-            Text {
+            // Holds either a glyph or an app icon image — an app icon stored as
+            // "app:brave-desktop" must not be painted as that literal string.
+            Item {
               id: heroIcon
-              text: root.showPicker
-                ? (root.labelFor(root.pickerFor).icon !== "" ? root.labelFor(root.pickerFor).icon : "")
-                : ""
-              color: Color.popups.text
-              font.family: root.bar ? root.bar.fontFamily : Style.font.family
-              font.pixelSize: Style.font.display
               anchors.left: parent.left
               anchors.verticalCenter: parent.verticalCenter
+              readonly property string current: root.showPicker ? root.labelFor(root.pickerFor).icon : ""
+              readonly property bool isApp: root.isAppIcon(heroIcon.current)
+
+              width: heroImage.visible ? heroImage.width : (heroGlyph.visible ? heroGlyph.implicitWidth : 0)
+              height: heroImage.visible ? heroImage.height : (heroGlyph.visible ? heroGlyph.implicitHeight : 0)
+              implicitWidth: width
+              implicitHeight: height
+
+              Text {
+                id: heroGlyph
+                anchors.centerIn: parent
+                visible: !heroIcon.isApp && heroIcon.current !== ""
+                text: heroIcon.current
+                textFormat: Text.PlainText
+                color: Color.popups.text
+                font.family: root.bar ? root.bar.fontFamily : Style.font.family
+                font.pixelSize: Style.font.display
+              }
+
+              Image {
+                id: heroImage
+                anchors.centerIn: parent
+                visible: heroIcon.isApp
+                width: visible ? Style.font.display : 0
+                height: width
+                fillMode: Image.PreserveAspectFit
+                sourceSize.width: Math.max(1, width * Screen.devicePixelRatio)
+                sourceSize.height: Math.max(1, height * Screen.devicePixelRatio)
+                source: heroIcon.isApp ? root.appIconSource(root.appIconName(heroIcon.current)) : ""
+                asynchronous: true
+              }
             }
 
             Column {
@@ -926,7 +1071,8 @@ Panel {
 
               Text {
                 text: root.showPicker
-                  ? ("WORKSPACE " + root.pickerFor + "  ·  " + root.filteredIcons.length + " ICONS")
+                  ? ("WORKSPACE " + root.pickerFor + "  ·  "
+                     + (root.filteredIcons.length + root.filteredApps.length) + " ICONS")
                   : (root.editableIds().length + " WORKSPACES  ·  RIGHT-CLICK TO EDIT")
                 color: Qt.darker(Color.popups.text, 1.4)
                 font.family: root.bar ? root.bar.fontFamily : Style.font.family
@@ -991,12 +1137,26 @@ Panel {
                   // a QQC.Popup inside this panel would be clipped by the
                   // ScrollView and could not take keyboard focus.
                   PanelActionButton {
-                    iconText: editRow.wsLabel.icon !== "" ? editRow.wsLabel.icon : "—"
+                    readonly property bool usesApp: root.isAppIcon(editRow.wsLabel.icon)
+                    iconText: usesApp ? "" : (editRow.wsLabel.icon !== "" ? editRow.wsLabel.icon : "—")
                     tooltipText: "Choose icon for workspace " + editRow.modelData
                     bordered: true
                     foreground: Color.popups.text
                     fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
                     onClicked: root.openPicker(editRow.modelData)
+
+                    Image {
+                      visible: parent.usesApp
+                      anchors.centerIn: parent
+                      width: Style.space(17)
+                      height: width
+                      fillMode: Image.PreserveAspectFit
+                      sourceSize.width: Math.max(1, width * Screen.devicePixelRatio)
+                      sourceSize.height: Math.max(1, height * Screen.devicePixelRatio)
+                      source: parent.usesApp
+                        ? root.appIconSource(root.appIconName(editRow.wsLabel.icon)) : ""
+                      asynchronous: true
+                    }
                   }
 
                   TextField {
@@ -1072,6 +1232,51 @@ Panel {
               Component.onCompleted: if (visible) Qt.callLater(searchField.forceActiveFocus)
             }
 
+            // Apps running on this workspace, resolved class -> StartupWMClass.
+            PanelSectionHeader {
+              visible: root.workspaceApps.length > 0
+              text: "ON THIS WORKSPACE"
+              foreground: Color.popups.text
+              fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
+            }
+
+            Flow {
+              width: parent.width
+              visible: root.workspaceApps.length > 0
+              spacing: Style.space(6)
+
+              Repeater {
+                model: root.workspaceApps
+
+                PanelActionButton {
+                  required property var modelData
+                  iconText: ""
+                  tooltipText: modelData.name
+                  bordered: root.labelFor(root.pickerFor).icon === root.appIconPrefix + modelData.icon
+                  foreground: Color.popups.text
+                  onClicked: root.chooseIcon(root.appIconPrefix + modelData.icon)
+
+                  Image {
+                    anchors.centerIn: parent
+                    width: Style.space(18)
+                    height: width
+                    fillMode: Image.PreserveAspectFit
+                    sourceSize.width: Math.max(1, width * Screen.devicePixelRatio)
+                    sourceSize.height: Math.max(1, height * Screen.devicePixelRatio)
+                    source: root.appIconSource(modelData.icon)
+                    asynchronous: true
+                  }
+                }
+              }
+            }
+
+            PanelSectionHeader {
+              visible: root.filteredIcons.length > 0
+              text: "GLYPHS"
+              foreground: Color.popups.text
+              fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
+            }
+
             Flow {
               width: parent.width
               spacing: Style.space(6)
@@ -1092,9 +1297,46 @@ Panel {
               }
             }
 
+            PanelSectionHeader {
+              visible: root.filteredApps.length > 0
+              text: "APPS"
+              foreground: Color.popups.text
+              fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
+            }
+
+            Flow {
+              width: parent.width
+              visible: root.filteredApps.length > 0
+              spacing: Style.space(6)
+
+              Repeater {
+                model: root.filteredApps
+
+                PanelActionButton {
+                  required property var modelData
+                  iconText: ""
+                  tooltipText: modelData.name
+                  bordered: root.labelFor(root.pickerFor).icon === root.appIconPrefix + modelData.icon
+                  foreground: Color.popups.text
+                  onClicked: root.chooseIcon(root.appIconPrefix + modelData.icon)
+
+                  Image {
+                    anchors.centerIn: parent
+                    width: Style.space(18)
+                    height: width
+                    fillMode: Image.PreserveAspectFit
+                    sourceSize.width: Math.max(1, width * Screen.devicePixelRatio)
+                    sourceSize.height: Math.max(1, height * Screen.devicePixelRatio)
+                    source: root.appIconSource(modelData.icon)
+                    asynchronous: true
+                  }
+                }
+              }
+            }
+
             Text {
               width: parent.width
-              visible: root.filteredIcons.length === 0
+              visible: root.filteredIcons.length === 0 && root.filteredApps.length === 0
               text: "No matching icons. Paste any glyph below instead."
               color: Qt.darker(Color.popups.text, 1.4)
               wrapMode: Text.WordWrap
