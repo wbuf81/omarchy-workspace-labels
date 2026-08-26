@@ -65,6 +65,22 @@ the Brave icon in one click.
 omarchy bar set wes.workspaces labels '{"3":{"icon":"app:brave-desktop","name":"Brave"}}' --json
 ```
 
+**No desktop entry for the thing on that workspace?** A site you keep open as a
+browser tab has no icon to offer. Install it as a web app and it gains one:
+
+```sh
+omarchy webapp install "Gmail" https://mail.google.com/ <icon-url-or-file>
+```
+
+It drops a 256px icon into `~/.local/share/icons` and writes a launcher, after
+which the app shows up in the picker like any other. Note that a site opened as
+an ordinary tab still reports the browser's window class, so **ON THIS
+WORKSPACE** will offer the browser — launch it through the web app to get its
+own class.
+
+`icon` also accepts an absolute path (`app:/home/you/icons/thing.png`) if you
+would rather not install anything; type it into the picker's glyph field.
+
 ## Install
 
 ```sh
