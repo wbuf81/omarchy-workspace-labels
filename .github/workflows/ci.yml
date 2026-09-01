@@ -1,0 +1,18 @@
+name: checks
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  static:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install release-check dependencies
+        run: sudo apt-get update && sudo apt-get install -y imagemagick jq ripgrep
+      - name: Run static and workspace-state checks
+        run: ./scripts/static-check.sh

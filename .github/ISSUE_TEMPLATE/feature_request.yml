@@ -1,0 +1,22 @@
+name: Feature request
+description: Suggest a workspace-labeling, icon, preview, or navigation improvement.
+title: "[Idea]: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: What should the plugin do?
+    validations:
+      required: true
+  - type: textarea
+    id: value
+    attributes:
+      label: Why would this improve your workspace flow?
+    validations:
+      required: true
+  - type: textarea
+    id: references
+    attributes:
+      label: Visual or interaction references
+      description: Screenshots, sketches, and links are welcome.

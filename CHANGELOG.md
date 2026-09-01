@@ -1,5 +1,21 @@
 # Changelog
 
+## 3.0.1
+
+- Workspace occupancy, app matching, and hover previews now use Quickshell's
+  complete Hyprland toplevel registry. This fixes missing sibling windows when
+  one application owns multiple surfaces.
+- Add/remove decisions moved into a shared, Qt-free logic module with
+  executable coverage for legacy pin migration, lowest-free-slot selection,
+  rapid adds, full capacity, occupied-workspace protection, saved-label rows,
+  invalid IDs, and label cleanup.
+- Malformed saved label data can no longer create editor rows beyond the
+  plugin's 20 empty-slot limit; genuine live Hyprland workspaces remain
+  unbounded.
+- Added reproducible static/native release checks, GitHub Actions, local sync
+  tooling, issue and pull-request templates, contribution guidance, and a
+  maintainer handoff.
+
 ## 3.0.0
 
 **Breaking: the plugin id changed** from `wes.workspaces` to

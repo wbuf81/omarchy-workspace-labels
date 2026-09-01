@@ -1,0 +1,55 @@
+name: Bug report
+description: A workspace did not show, switch, preview, add, remove, or save correctly.
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for helping make Workspace Labels sturdier.
+  - type: input
+    id: omarchy-version
+    attributes:
+      label: Omarchy version
+      description: Run `omarchy version`.
+      placeholder: 4.0.2-1
+    validations:
+      required: true
+  - type: dropdown
+    id: bar
+    attributes:
+      label: Bar orientation
+      options: [Horizontal, Vertical]
+    validations:
+      required: true
+  - type: dropdown
+    id: monitors
+    attributes:
+      label: Monitor setup
+      options: [Single monitor, Multiple monitors]
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+      description: Include the workspace numbers involved and whether they contained windows.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant shell log
+      description: Paste related lines from the Quickshell log if available.
+      render: text

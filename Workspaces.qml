@@ -7,6 +7,7 @@ import Quickshell.Hyprland
 import Quickshell.Wayland
 import qs.Ui
 import qs.Commons
+import "Logic.js" as Logic
 
 // Workspace labels for the Omarchy bar.
 //
@@ -268,7 +269,7 @@ Panel {
     if (!ws || !root.appLibrary) return []
 
     var classes = []
-    var tl = ws.toplevels.values
+    var tl = root.toplevelsForWorkspace(id)
     for (var i = 0; i < tl.length; i++) {
       var o = tl[i].lastIpcObject
       var cls = o ? String(o["class"] || "") : ""
@@ -319,11 +320,7 @@ Panel {
   // dead weight that would keep a phantom row in the editor forever, since
   // editableIds() keeps every id that still has a stored label.
   function pruneLabels(map) {
-    for (var k in map) {
-      var v = map[k]
-      if (v && v.icon === "" && v.name === "" && root.defaultLabels[k] === undefined) delete map[k]
-    }
-    return map
+    return Logic.prunedLabels(map, root.defaultLabels)
   }
 
   function setIcon(id, glyph) {
@@ -362,22 +359,7 @@ Panel {
   // ---------------------------------------------------------------------
   readonly property var pinnedIds: {
     var raw = root.effSetting("pinned", null)
-    var out = []
-
-    if (Array.isArray(raw)) {
-      for (var i = 0; i < raw.length; i++) {
-        var id = parseInt(raw[i], 10)
-        if (!isNaN(id) && id > 0 && id <= root.maxWorkspace && out.indexOf(id) === -1) out.push(id)
-      }
-    } else {
-      var floor = parseInt(root.effSetting("minWorkspaces", 5), 10)
-      if (isNaN(floor) || floor < 0) floor = 0
-      if (floor > root.maxWorkspace) floor = root.maxWorkspace
-      for (var n = 1; n <= floor; n++) out.push(n)
-    }
-
-    out.sort(function(left, right) { return left - right })
-    return out
+    return Logic.normalizedPinned(raw, root.effSetting("minWorkspaces", 5), root.maxWorkspace)
   }
 
   function workspaceById(id) {
@@ -389,67 +371,60 @@ Panel {
     return null
   }
 
+  // Workspace.toplevels can lag or omit sibling surfaces when an application
+  // owns multiple windows. Use Quickshell's complete toplevel registry for
+  // previews and filter by the workspace reported by each client instead.
+  function toplevelsForWorkspace(id) {
+    var out = []
+    var values = Hyprland.toplevels.values
+    for (var i = 0; i < values.length; i++) {
+      var toplevel = values[i]
+      var ipc = toplevel.lastIpcObject
+      var workspaceId = ipc && ipc.workspace ? ipc.workspace.id : 0
+      if (Number(workspaceId) === Number(id)) out.push(toplevel)
+    }
+    return out
+  }
+
   function hasWindows(id) {
-    var ws = root.workspaceById(id)
-    return ws !== null && ws.toplevels.values.length > 0
+    return root.toplevelsForWorkspace(id).length > 0
   }
 
   // Every workspace Hyprland currently reports, plus the pinned slots. No
   // upper bound on live ones: a workspace that exists always gets a button.
   function workspaceIds() {
-    var ids = []
+    var liveIds = []
     var values = Hyprland.workspaces.values
 
     for (var i = 0; i < values.length; i++) {
       var id = values[i].id
-      if (id > 0 && ids.indexOf(id) === -1) ids.push(id)
+      if (id > 0) liveIds.push(id)
     }
 
     // A freshly created workspace can be focused before it holds a toplevel.
     var focusedWs = Hyprland.focusedWorkspace
-    if (focusedWs && focusedWs.id > 0 && ids.indexOf(focusedWs.id) === -1) ids.push(focusedWs.id)
-
-    var pinned = root.pinnedIds
-    for (var p = 0; p < pinned.length; p++) {
-      if (ids.indexOf(pinned[p]) === -1) ids.push(pinned[p])
-    }
-
-    ids.sort(function(left, right) { return left - right })
-    return ids
+    return Logic.visibleWorkspaceIds(liveIds, focusedWs ? focusedWs.id : 0, root.pinnedIds)
   }
 
   // Workspaces worth showing a row for: the visible ones plus any that still
   // carry a saved label, so a label survives its workspace going away.
   function editableIds() {
-    var ids = root.workspaceIds()
-    for (var k in root.storedLabels) {
-      var n = parseInt(k, 10)
-      if (!isNaN(n) && n > 0 && ids.indexOf(n) === -1) ids.push(n)
-    }
-    ids.sort(function(left, right) { return left - right })
-    return ids
+    return Logic.editableWorkspaceIds(root.workspaceIds(), root.storedLabels, root.maxWorkspace)
   }
 
-  // Lowest unused slot, or -1 when everything up to maxWorkspace is taken.
+  // Lowest unused slot, or 0 when everything up to maxWorkspace is taken.
   function nextFreeId() {
-    var ids = root.workspaceIds()
-    for (var n = 1; n <= root.maxWorkspace; n++) {
-      if (ids.indexOf(n) === -1) return n
-    }
-    return -1
+    return Logic.nextFreeId(root.workspaceIds(), root.maxWorkspace)
   }
 
   readonly property bool canAdd: root.nextFreeId() > 0
 
   function addWorkspace() {
-    var id = root.nextFreeId()
+    var state = Logic.addedWorkspaceState(root.workspaceIds(), root.pinnedIds, root.maxWorkspace)
+    var id = state.id
     if (id < 1) return
 
-    var pinned = root.pinnedIds.slice()
-    if (pinned.indexOf(id) === -1) pinned.push(id)
-    pinned.sort(function(left, right) { return left - right })
-
-    root.persist({ pinned: pinned })
+    root.persist({ pinned: state.pinned })
     root.focusWorkspace(id)
     root.openFor(id, true)
   }
@@ -457,16 +432,12 @@ Panel {
   // Unpin a slot and forget its label. A workspace that still holds windows
   // keeps its button until it empties - unpinning only drops the reservation.
   function removeWorkspace(id) {
-    if (root.hasWindows(id)) return
+    var state = Logic.removedWorkspaceState(
+      id, root.isEditable(id), root.hasWindows(id), root.pinnedIds,
+      root.effectiveMap(), root.maxWorkspace)
+    if (!state.removed) return
 
-    var pinned = root.pinnedIds.slice()
-    var at = pinned.indexOf(id)
-    if (at !== -1) pinned.splice(at, 1)
-
-    var labels = root.effectiveMap()
-    delete labels[String(id)]
-
-    root.persist({ pinned: pinned, labels: root.pruneLabels(labels) })
+    root.persist({ pinned: state.pinned, labels: root.pruneLabels(state.labels) })
     if (root.editorTarget === id) root.editorTarget = 0
     if (root.pickerFor === id) root.showPicker = false
   }
@@ -667,7 +638,7 @@ Panel {
     var ws = root.workspaceById(root.hoverPreviewId)
     if (!ws) return []
 
-    var all = ws.toplevels.values
+    var all = root.toplevelsForWorkspace(root.hoverPreviewId)
     var out = []
     for (var i = 0; i < all.length; i++) {
       var o = all[i].lastIpcObject
@@ -751,7 +722,7 @@ Panel {
         required property int modelData
 
         readonly property var workspace: root.workspaceById(modelData)
-        readonly property bool occupied: workspace !== null && workspace.toplevels.values.length > 0
+        readonly property bool occupied: root.hasWindows(modelData)
         readonly property bool focused: Hyprland.focusedWorkspace !== null && Hyprland.focusedWorkspace.id === modelData
 
         // Named wsLabel, not label: WidgetButton already has an internal

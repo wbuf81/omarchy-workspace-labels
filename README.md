@@ -1,85 +1,57 @@
-<h1 align="center">Workspace Labels</h1>
+<div align="center">
+  <img src="docs/social-preview.png" alt="Workspace Labels — named Omarchy workspaces with previews and real app icons" width="100%">
 
-<p align="center">
-  Named workspaces with per-workspace icons for the <a href="https://omarchy.org">Omarchy</a> bar.
-</p>
+  <br>
 
-<p align="center">
-  <img src="docs/bar.png" alt="Named workspaces in the Omarchy bar" width="470">
-</p>
+  <a href="https://omarchy.org/"><img src="https://img.shields.io/badge/Omarchy-4.0.2_tested-7aa2f7?style=flat-square" alt="Tested on Omarchy 4.0.2"></a>
+  <a href="https://quickshell.org/"><img src="https://img.shields.io/badge/QML-Quickshell-6fe7f2?style=flat-square" alt="Built with QML and Quickshell"></a>
+  <a href="https://github.com/wbuf81/omarchy-workspace-labels/actions"><img src="https://img.shields.io/github/actions/workflow/status/wbuf81/omarchy-workspace-labels/ci.yml?style=flat-square&amp;label=checks" alt="Checks status"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-b4f9f8?style=flat-square" alt="MIT license"></a>
 
-Stock Omarchy gives you `1 2 3 4 5`. This gives them names and icons, underlines
-the one you're on, and lets you edit all of it in place — no config file, no
-shell restart.
+  <strong>Give the workspaces you actually use a name, an icon, and a face.</strong>
+</div>
 
-<p align="center">
-  <img src="docs/editor.png" alt="The workspace editor panel" width="480">
-</p>
+Stock Omarchy gives you `1 2 3 4 5`. Workspace Labels turns that strip into a
+compact, editable map of your desktop: names, Nerd Font glyphs or real app
+icons, instant switching, and a hover preview that shows where every window is.
 
-## Why it looks native
+Everything is edited in place. No hand-maintained config file and no shell
+restart after changing a label.
 
-The editor isn't a bolted-on popup. It's built on `Ui.Panel` + `Ui.KeyboardPanel`
-— the same machinery behind Omarchy's built-in wifi, volume and display menus —
-so it takes real keyboard focus, scrolls and clamps inside the screen, and hands
-the popout slot over correctly when you open another bar widget.
+<div align="center">
+  <img src="docs/bar.png" alt="Named workspaces in the Omarchy bar" width="545">
+</div>
 
-- **Hover to see what's on it** — a scaled map of the workspace, windows drawn at their real positions and sizes.
-- **Editable in place** — right-click any workspace, rename it, pick an icon.
-- **Real app icons** — use the actual Brave lion or Spotify mark, not an approximation. Apps running on the workspace you're editing are offered first.
-- **Icon picker built in** — 49 render-verified Nerd Font glyphs plus every installed app, searchable, or paste your own.
-- **Add and remove workspaces** — `+` pins the next free slot; `×` gives it back.
-- **Fully keyboard driven** — `j`/`k`, `Enter`, `i`, `a`, `x`, `Esc`.
-- **Unbounded** — any workspace Hyprland reports gets a button, named or not.
-- **Saves instantly** — writes straight to `shell.json`; nothing to reload.
+## Why it feels native
 
-<p align="center">
-  <img src="docs/preview.png" alt="Hover preview of a workspace" width="480">
-</p>
+- **Built from Omarchy's own UI pieces.** The editor uses `Ui.Panel` and
+  `Ui.KeyboardPanel`, so it takes real keyboard focus, clamps and scrolls
+  inside the screen, and shares the bar's popout slot correctly.
+- **A preview, not a guess.** Hover a workspace to see a scaled map of its
+  windows at their actual positions and sizes—even when that workspace is not
+  currently visible.
+- **Real app icons.** Use the installed Brave, Spotify, or terminal icon rather
+  than an approximation. Apps on the workspace being edited are offered first.
+- **Fast enough to forget about.** Window captures are single-shot, delayed
+  until a deliberate hover, and capped at twelve—not continuously streamed.
+- **Keyboard friendly.** Navigate, rename, choose an icon, add, and remove
+  without leaving the home row.
+- **Theme and layout aware.** Horizontal bars show icon and name; vertical bars
+  collapse naturally to an icon-first column.
+- **State stays local.** Labels and pins live only in this widget's existing
+  `shell.json` layout entry. No service, database, or state directory is added.
 
-Hovering a workspace draws a miniature of it — each window captured through
-Hyprland's toplevel export and placed at its true position and size, so a
-tiled pair reads as a tiled pair. It works for workspaces you aren't currently
-on, which is the whole point: the compositor never renders those, so there is
-no single screenshot to grab and the preview has to be assembled per window.
+## See your desktop before you switch
 
-Captures are taken once per hover (`live: false`), not streamed — a live feed
-per window every time the pointer crosses the bar would be far too expensive.
+| Edit names and icons in place | Hover to see the real window layout |
+| --- | --- |
+| <img src="docs/editor.png" alt="Workspace Labels editor panel" width="100%"> | <img src="docs/preview.png" alt="Hover preview showing windows at their real positions" width="100%"> |
 
-<p align="center">
-  <img src="docs/picker.png" alt="The inline icon picker" width="480">
-</p>
-
-### App icons
-
-The picker lists every installed application alongside the glyphs. Pick one and
-the workspace shows that app's real icon.
-
-An app icon is stored as `app:<icon-name>` — the name from the desktop entry's
-`Icon=` field, **not** the window class. Those often differ: Brave's window
-class is `brave-browser` but its icon is `brave-desktop`. The picker's
-**ON THIS WORKSPACE** row resolves that for you by matching each running
-window's class against `StartupWMClass`, so a workspace running Brave offers
-the Brave icon in one click.
-
-```sh
-omarchy bar set io.github.wbuf81.workspace-labels labels '{"3":{"icon":"app:brave-desktop","name":"Brave"}}' --json
-```
-
-**No desktop entry for the thing on that workspace?** A site you keep open as a
-browser tab has no icon to offer. Install it as a web app and it gains one:
-
-```sh
-omarchy webapp install "Gmail" https://mail.google.com/ <icon-url-or-file>
-```
-
-It drops a 256px icon into `~/.local/share/icons` and writes a launcher, after
-which the app shows up in the picker like any other. Note that a site opened as
-an ordinary tab still reports the browser's window class, so **ON THIS
-WORKSPACE** will offer the browser — launch it through the web app to get its
-own class.
-
-`icon` also accepts an absolute path (`app:/home/you/icons/thing.png`) if you
-would rather not install anything; type it into the picker's glyph field.
+Hyprland does not render an inactive workspace as one capturable output, so the
+preview is assembled from its individual windows. Each window is captured
+through Quickshell's toplevel export and placed in monitor coordinates. A tiled
+pair still reads as a tiled pair, and floating windows remain stacked above
+tiled ones.
 
 ## Install
 
@@ -88,119 +60,230 @@ omarchy plugin add https://github.com/wbuf81/omarchy-workspace-labels.git --enab
 omarchy bar move io.github.wbuf81.workspace-labels --section left
 ```
 
-Requires Hyprland and a Nerd Font — the icon presets are verified against
-JetBrainsMono Nerd Font.
+Requires Hyprland and a Nerd Font. The bundled glyph choices were
+render-verified with JetBrainsMono Nerd Font.
 
-## Remove
+Update later with:
 
 ```sh
-omarchy plugin disable io.github.wbuf81.workspace-labels      # take it off the bar, keep it installed
-omarchy plugin remove io.github.wbuf81.workspace-labels       # uninstall it
-omarchy plugin enable omarchy.workspaces   # put the stock indicators back
+omarchy plugin update io.github.wbuf81.workspace-labels
 ```
 
-Your labels and pinned list live in `~/.config/omarchy/shell.json` under this
-widget's layout entry and go with it. Nothing is written anywhere else — no
-files outside that entry, no services, no state directories.
+Disable, remove, or return to the stock workspace widget with:
 
-## Use
+```sh
+omarchy plugin disable io.github.wbuf81.workspace-labels
+omarchy plugin remove io.github.wbuf81.workspace-labels
+omarchy plugin enable omarchy.workspaces
+```
+
+Removing the plugin also removes its layout entry, including saved labels and
+pins. Nothing is written outside that entry.
+
+## Everyday controls
 
 | Action | Result |
 | --- | --- |
-| Hover a workspace | Preview the windows on it (~0.5s delay) |
+| Hover a workspace | Preview its windows after ~0.45 seconds |
 | Left-click a workspace | Switch to it |
-| Right-click a workspace | Open the editor on that workspace's row |
-| Scroll over the bar | Previous / next workspace |
-| Click `+` | Pin, focus and name the next free workspace |
-| `SUPER + ALT + W` | Toggle the editor |
+| Right- or middle-click a workspace | Open the editor on that row |
+| Scroll over the widget | Previous or next visible workspace |
+| Click `+` | Pin, focus, and name the lowest free workspace |
+| `SUPER + ALT + W` | Toggle the editor with the optional binding below |
 
 Inside the editor:
 
 | Key | Action |
 | --- | --- |
-| `j` `k` / arrows | Move the row cursor |
+| `j` `k` or arrows | Move the row cursor |
 | `Enter` | Rename the highlighted workspace |
 | `i` | Open its icon picker |
-| `a` | Add a workspace |
-| `x` | Remove the highlighted workspace |
+| `a` | Add the lowest free workspace |
+| `x` | Remove the highlighted empty workspace |
 | `Esc` | Leave the picker, then close the panel |
 
-Removing only unpins a workspace and forgets its label. One that still holds
-windows keeps its button until it empties.
+## Adding and removing is deliberately conservative
 
-An unnamed workspace falls back to its number, so a button can never become
-invisible — clear both fields on a named one to get the bare number back.
+`+` does not ask Hyprland to invent a permanent workspace object. It reserves
+the lowest free slot in the plugin's `pinned` list, switches to it, and opens
+the name field. The focused workspace appears immediately, even before its
+first window arrives.
 
-## Settings
+Removing a row unpins the slot and forgets only that row's saved label. If the
+workspace still contains any window, removal is blocked and the button explains
+why. An unpinned live workspace remains in the bar until Hyprland removes it;
+an empty row with a saved label remains editable until you remove it.
 
-Stored inline in `~/.config/omarchy/shell.json` under this widget's layout entry.
+The plugin can create empty slots 1–20. Real Hyprland workspaces are not capped:
+if workspace 37 exists, it still appears and can be labeled.
+
+## Pick an icon that actually belongs there
+
+<div align="center">
+  <img src="docs/picker.png" alt="Searchable glyph and application icon picker" width="620">
+</div>
+
+The picker includes 49 verified Nerd Font glyphs and every installed desktop
+application with an icon. Its **ON THIS WORKSPACE** row matches each running
+window class against the desktop entry's `StartupWMClass`. That indirection
+matters: Brave's window class is `brave-browser`, while its desktop icon is
+`brave-desktop`.
+
+Application icons are stored as `app:<icon-name>`:
+
+```sh
+omarchy bar set io.github.wbuf81.workspace-labels labels \
+  '{"3":{"icon":"app:brave-desktop","name":"Brave"}}' --json
+```
+
+A web page opened as an ordinary browser tab has no independent desktop entry,
+so the picker correctly offers the browser icon. Install it as an Omarchy web
+app to give it its own launcher, class, and icon:
+
+```sh
+omarchy webapp install "Gmail" https://mail.google.com/ <icon-url-or-file>
+```
+
+`icon` also accepts an absolute path such as
+`app:/home/you/icons/thing.png`; paste it into the picker's glyph field.
+
+## Settings and scripting
+
+Settings are stored inline under this widget's layout entry in
+`~/.config/omarchy/shell.json` and update live.
 
 | Key | Type | Meaning |
 | --- | --- | --- |
-| `labels` | object | `{"1": {"icon": "…", "name": "Code"}}`. `icon` is a glyph, or `app:<icon-name>` for an application icon. |
-| `hoverPreview` | boolean | Hover previews. Default `true`; set `false` to turn them off. |
-| `pinned` | array | Workspace numbers kept in the bar even when empty. Managed by `+` and `×`. |
-| `minWorkspaces` | integer | Legacy. Only read while `pinned` is unset, where it pins `1..N`. |
-
-Scriptable, and picked up live:
+| `labels` | object | Workspace number to `{icon, name}`. `icon` is a glyph or `app:<icon-name>`. |
+| `hoverPreview` | boolean | Single-shot hover previews; default `true`. |
+| `pinned` | array | Empty workspace numbers kept in the bar; managed by add/remove. |
+| `minWorkspaces` | integer | Legacy fallback that seeds `1..N` only while `pinned` is unset. |
 
 ```sh
-omarchy bar set io.github.wbuf81.workspace-labels labels '{"1":{"icon":"","name":"Code"}}' --json
+omarchy bar set io.github.wbuf81.workspace-labels labels \
+  '{"1":{"icon":"","name":"Code"}}' --json
 omarchy bar set io.github.wbuf81.workspace-labels pinned '[1,2,3,4,5]' --json
 ```
 
-## IPC
+IPC endpoints make the same interactions bindable and scriptable:
 
 ```sh
-omarchy-shell io.github.wbuf81.workspace-labels toggleEditor   # also: toggle / open / close
-omarchy-shell io.github.wbuf81.workspace-labels openFor 3      # open targeting workspace 3
-omarchy-shell io.github.wbuf81.workspace-labels picker 3       # jump to its icon picker
+omarchy-shell io.github.wbuf81.workspace-labels toggleEditor  # also: toggle/open/close
+omarchy-shell io.github.wbuf81.workspace-labels openFor 3
+omarchy-shell io.github.wbuf81.workspace-labels picker 3
 omarchy-shell io.github.wbuf81.workspace-labels add
 omarchy-shell io.github.wbuf81.workspace-labels remove 6
-omarchy-shell io.github.wbuf81.workspace-labels next           # cycle workspaces
+omarchy-shell io.github.wbuf81.workspace-labels next
 omarchy-shell io.github.wbuf81.workspace-labels prev
-omarchy-shell io.github.wbuf81.workspace-labels reset          # back to built-in defaults
-omarchy-shell io.github.wbuf81.workspace-labels preview 3      # peek at a workspace without hovering
+omarchy-shell io.github.wbuf81.workspace-labels preview 3
 omarchy-shell io.github.wbuf81.workspace-labels unpreview
+omarchy-shell io.github.wbuf81.workspace-labels reset
 ```
 
-On a multi-monitor setup the panel opens on one bar instance, not all of them
-— matching how the built-in wifi, clock and volume panels behave. Right-click
-works on whichever monitor you click.
-
-## Keybinding
-
-In `~/.config/hypr/bindings.lua`:
+For a keyboard toggle, add this to `~/.config/hypr/bindings.lua`:
 
 ```lua
 o.bind("SUPER + ALT + W", "Workspace labels", "omarchy-shell io.github.wbuf81.workspace-labels toggleEditor")
 ```
 
-`next` / `prev` work here too if you'd rather bind them than scroll.
+On multiple monitors, the editor opens only on the bar instance you invoked,
+matching Omarchy's built-in wifi, clock, and volume panels.
 
-## Notes
+## Edge cases already handled
 
-- Cloned from the built-in `omarchy.workspaces` widget.
-- Editing the QML needs `omarchy restart shell`. The file watcher logs
-  `Local plugin changed, reloading` on save, but that does **not** re-render
-  the widget — the log line is emitted by the watcher, not by a successful
-  reload.
-- Verified on a single horizontal top bar and on a vertical (left) bar, where
-  the widget renders icon-only in a column and the panel anchors beside it.
-  Multi-monitor is implemented to the same convention as the built-in panels
-  but has not been exercised on a second screen.
+| Situation | Behavior |
+| --- | --- |
+| Two rapid add clicks | The second sees staged state and selects the next free slot. |
+| Duplicate or malformed pinned IDs | Invalid, fractional, negative, duplicate, and out-of-range entries are ignored. |
+| All slots 1–20 occupied or pinned | Add hides/disables instead of producing an invalid workspace. |
+| Remove an occupied workspace | No state changes; the row remains protected. |
+| Remove an unpinned saved-label row | Only that label is forgotten. |
+| Application with several windows | Occupancy and preview use the complete Hyprland toplevel registry. |
+| Workspace above slot 20 | Live workspace still appears; only empty user-created slots are capped. |
+| Empty icon and name | Bar falls back to the workspace number, so the button remains clickable. |
+| External `shell.json` edit | Pending local state expires, allowing the external value to win. |
+| Editor and hover preview collide | Editor owns the popout slot and dismisses the preview. |
+| Pathological window count | Preview captures at most twelve windows. |
 
-## Third-party
+## Local development
 
-No third-party code is bundled. At runtime the plugin uses only APIs provided by
-Omarchy's quickshell configuration (`qs.Ui`, `qs.Commons`) and Quickshell itself.
+Omarchy intentionally rejects plugin symlinks. Use the copy-and-rescan helper:
 
-Icon glyphs come from whichever Nerd Font the bar is configured to use, and
-application icons are read from the desktop entries and icon themes already
-installed on the machine — neither is redistributed here. Application logos
-visible in the screenshots are trademarks of their respective owners and appear
-only to illustrate what the plugin does.
+```sh
+git clone https://github.com/wbuf81/omarchy-workspace-labels.git
+cd omarchy-workspace-labels
 
-## License
+./scripts/dev-sync.sh --enable  # first run
+./scripts/dev-sync.sh           # after later edits
+```
 
-MIT — see [LICENSE](LICENSE).
+If the shell watcher reports a change but the widget still looks stale, run
+`omarchy restart shell`. The watcher log confirms detection, not necessarily a
+successful live QML reconstruction.
+
+## Validate and test
+
+Workspace selection and add/remove transitions live in `Logic.js`, the same
+module imported by the QML widget. They run under Node without a compositor.
+
+```sh
+./scripts/static-check.sh   # manifest, assets, QML parse, scripts, state tests
+./scripts/release-check.sh  # all of the above + Omarchy's native validator
+```
+
+GitHub Actions runs the portable suite on every push and pull request. The
+native validator and interactive checks intentionally run on an Omarchy
+machine.
+
+Before a release, manually sanity-check:
+
+- add from a gap (`1, 2, 4` should create `3`) and add twice rapidly;
+- add when every slot through 20 is present and confirm no `+` remains;
+- remove a pinned empty workspace and an unpinned row with only a saved label;
+- try to remove tiled, floating, and multi-window occupied workspaces;
+- close the last window, then remove the now-empty workspace;
+- rename and change icons rapidly, restart the shell, and confirm persistence;
+- preview one-window, tiled, floating, and multi-window workspaces;
+- test one horizontal and one vertical bar;
+- test each connected monitor, then disable, re-enable, update, and remove.
+
+## How it fits together
+
+| File | Responsibility |
+| --- | --- |
+| `Workspaces.qml` | Bar widget, editor, icon picker, previews, persistence, and IPC |
+| `Logic.js` | Tested normalization, visible/editor unions, and add/remove transitions |
+| `manifest.json` | Omarchy metadata, defaults, settings schema, and entry point |
+| `tests/logic.test.js` | Executable workspace-state regression coverage |
+| `scripts/static-check.sh` | Portable CI and release-asset checks |
+| `scripts/release-check.sh` | Native Omarchy validation plus the portable suite |
+
+## Contributing
+
+Bug reports, workflow ideas, unusual monitor setups, and pull requests are
+welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for the development loop and
+design principles. Changes are tracked in [CHANGELOG.md](CHANGELOG.md), and
+release/architecture handoff details live in
+[MAINTAINER_NOTES.md](MAINTAINER_NOTES.md).
+
+## Share it
+
+The repository-ready 1280×640 card lives at
+[`docs/social-preview.png`](docs/social-preview.png). Upload it under
+**GitHub → Settings → General → Social preview**.
+
+The atmospheric workspace layer was generated for this project. The bar and
+hover preview shown on top are crops of the real running plugin. Rebuild the
+composite with `./scripts/build-social-card.sh` after updating screenshots.
+
+## Third-party and license
+
+No third-party code is bundled. At runtime the plugin uses Omarchy's
+Quickshell configuration (`qs.Ui`, `qs.Commons`) and Quickshell itself.
+
+Glyphs come from the configured Nerd Font; app icons come from desktop entries
+and icon themes already installed on the machine. Neither is redistributed.
+Application logos in screenshots are trademarks of their respective owners and
+appear only to demonstrate behavior.
+
+[MIT](LICENSE) © 2026 Wes.
