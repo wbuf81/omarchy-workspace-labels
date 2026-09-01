@@ -19,13 +19,15 @@ jq -e '
 
 for required in Workspaces.qml Logic.js README.md CHANGELOG.md CONTRIBUTING.md \
   MAINTAINER_NOTES.md LICENSE docs/bar.png docs/editor.png docs/picker.png \
-  docs/preview.png docs/social-preview.png assets/social/share-card-background.png; do
+  docs/preview.png docs/social-preview.png preview.png \
+  assets/social/share-card-background.png; do
   test -s "$required"
 done
 
 dimensions="$(identify -format '%wx%h' docs/social-preview.png)"
 test "$dimensions" = "1280x640"
 test "$(stat -c %s docs/social-preview.png)" -lt 1048576
+cmp -s preview.png docs/social-preview.png
 
 # These are release-critical integration contracts, not style preferences.
 rg -q 'import "Logic.js" as Logic' Workspaces.qml

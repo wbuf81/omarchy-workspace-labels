@@ -207,12 +207,10 @@ matching Omarchy's built-in wifi, clock, and volume panels.
 
 ## Local development
 
-Omarchy intentionally rejects plugin symlinks. Use the copy-and-rescan helper:
+Omarchy intentionally rejects plugin symlinks. From an existing local checkout,
+use the copy-and-rescan helper:
 
 ```sh
-git clone https://github.com/wbuf81/omarchy-workspace-labels.git
-cd omarchy-workspace-labels
-
 ./scripts/dev-sync.sh --enable  # first run
 ./scripts/dev-sync.sh           # after later edits
 ```
