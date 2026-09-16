@@ -1,5 +1,22 @@
 # Changelog
 
+## 3.2.1
+
+- **Fixed shell crashes at startup introduced in 3.2.0.** The 3.2.0 fix for
+  windows opened after the shell started read each toplevel's `workspace`
+  object inside QML bindings. During startup Quickshell parses `hyprctl
+  clients` before `hyprctl workspaces` has answered and hands toplevels
+  placeholder workspaces; observing those from bindings coincided with two
+  segfaults inside Qt's property-update machinery. The plugin now reads only
+  the IPC snapshot and asks Quickshell for a refresh, debounced to one request
+  per burst of window events, so new windows still appear within a few tens of
+  milliseconds. Six consecutive shell restarts ran clean after the change.
+- **Fixed preview geometry on scaled displays.** Hyprland reports monitors in
+  physical pixels but windows in logical pixels, so at 1.25× every window was
+  drawn a fifth too small with a padded strip along the right and bottom. The
+  preview now scales against the logical size, handles rotated outputs, is a
+  little wider, and its footer shows the scale.
+
 ## 3.2.0
 
 **Reliable previews, auto icons, and more of the station-board character.**

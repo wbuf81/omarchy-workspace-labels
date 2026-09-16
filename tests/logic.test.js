@@ -240,4 +240,15 @@ assert.deepEqual(Logic.focusGeometry(items, 1, true, 2), {x: 38, y: 0, width: 2,
 assert.equal(Logic.focusGeometry(items, 9, false, 2).visible, false)
 assert.equal(Logic.focusGeometry(null, 1, false, 2).visible, false)
 
+// Hyprland reports a monitor's size in physical pixels but window geometry in
+// logical pixels, so the preview scales against the logical size. Rotated
+// monitors swap the axes.
+assert.deepEqual(Logic.logicalMonitor({x: 0, y: 0, width: 3440, height: 1440, scale: 1.25, transform: 0}),
+  {x: 0, y: 0, width: 2752, height: 1152, scale: 1.25})
+assert.deepEqual(Logic.logicalMonitor({x: 3440, y: 0, width: 1920, height: 1080, scale: 1, transform: 1}),
+  {x: 3440, y: 0, width: 1080, height: 1920, scale: 1})
+assert.deepEqual(Logic.logicalMonitor({x: 0, y: 0, width: 2560, height: 1440, scale: 0, transform: 3}),
+  {x: 0, y: 0, width: 1440, height: 2560, scale: 1})
+assert.equal(Logic.logicalMonitor(null), null)
+
 console.log("workspace add/remove logic tests passed")

@@ -401,20 +401,24 @@ Panel {
   // owns multiple windows. Use Quickshell's complete toplevel registry and
   // filter by each toplevel's workspace instead.
   //
-  // A window opened after the shell started has a tracked `workspace`
-  // property straight away, but its `lastIpcObject` is an empty stub until
-  // Quickshell next runs `hyprctl clients`. Prefer the live property and only
-  // fall back to the IPC snapshot.
+  // Read only the IPC snapshot here. A window opened after the shell started
+  // has an empty `lastIpcObject` until Quickshell next runs `hyprctl
+  // clients`, which refreshToplevels() below requests on every window event.
+  //
+  // Do NOT read `toplevel.workspace` in bindings. During startup Quickshell
+  // parses `j/clients` before `j/workspaces` has answered and hands each
+  // toplevel a placeholder workspace ("requested before creation, early init
+  // with id -1"); bindings observing those objects were the common factor in
+  // two shell segfaults inside Qt::endPropertyUpdateGroup on 2026-09-16.
   function toplevelWorkspaceId(toplevel) {
-    if (toplevel.workspace && toplevel.workspace.id !== undefined) return Number(toplevel.workspace.id)
     var ipc = toplevel.lastIpcObject
     return ipc && ipc.workspace ? Number(ipc.workspace.id) : 0
   }
 
   function toplevelAddress(toplevel) {
-    if (toplevel.address) return String(toplevel.address)
     var ipc = toplevel.lastIpcObject
-    return ipc && ipc.address ? String(ipc.address) : ""
+    if (ipc && ipc.address) return String(ipc.address)
+    return toplevel.address ? String(toplevel.address) : ""
   }
 
   function toplevelsForWorkspace(id) {
@@ -426,11 +430,16 @@ Panel {
     return out
   }
 
-  // Geometry, class, and title only arrive with the IPC snapshot, so ask for
-  // one whenever a window appears, moves, or leaves. Cheap: one `hyprctl
-  // clients` per event, and Quickshell coalesces the result.
-  function refreshToplevels() {
-    if (typeof Hyprland.refreshToplevels === "function") Hyprland.refreshToplevels()
+  // Workspace, geometry, class, and title only arrive with the IPC snapshot,
+  // so ask for one whenever a window appears, moves, or leaves. Debounced so
+  // a burst of events costs one `hyprctl clients`, and so the request never
+  // runs synchronously inside the event that triggered it.
+  function refreshToplevels() { toplevelRefresh.restart() }
+
+  Timer {
+    id: toplevelRefresh
+    interval: 40
+    onTriggered: if (typeof Hyprland.refreshToplevels === "function") Hyprland.refreshToplevels()
   }
 
   function hasWindows(id) {
@@ -722,12 +731,18 @@ Panel {
   // The preview box is sized here, not derived from the Column's implicit
   // size: a Rectangle with an explicit `width` still has implicitWidth 0, so
   // the Column under-reported and the card clipped the miniature.
-  readonly property int previewBoxWidth: Style.space(300)
+  readonly property int previewBoxWidth: Style.space(340)
   readonly property int previewBoxHeight: {
-    var m = root.previewMonitor
+    var m = root.previewScreen
     var ratio = (m && m.width > 0) ? m.height / m.width : 0.625
     return Math.max(40, Math.round(root.previewBoxWidth * ratio))
   }
+
+  // The previewed monitor in logical pixels. Hyprland reports monitors in
+  // physical pixels but window positions in logical ones, so at a 1.25 scale
+  // the physical size would shrink every window by a fifth and leave a
+  // padded strip along the right and bottom of the well.
+  readonly property var previewScreen: Logic.logicalMonitor(root.previewMonitor)
 
   // Geometry of the monitor the previewed workspace lives on. An empty or
   // pinned workspace may not be assigned to one, so fall back to the focused

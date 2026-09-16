@@ -86,10 +86,10 @@ PopupCard {
       border.color: host.line
       clip: true
 
-      readonly property real sx: host.previewMonitor && host.previewMonitor.width > 0
-        ? width / host.previewMonitor.width : 0
-      readonly property real originX: host.previewMonitor ? host.previewMonitor.x : 0
-      readonly property real originY: host.previewMonitor ? host.previewMonitor.y : 0
+      readonly property real sx: host.previewScreen && host.previewScreen.width > 0
+        ? width / host.previewScreen.width : 0
+      readonly property real originX: host.previewScreen ? host.previewScreen.x : 0
+      readonly property real originY: host.previewScreen ? host.previewScreen.y : 0
 
       // Instrument-console chrome: a quiet reference grid under the windows,
       // edge ticks at the midpoints, corner frames above everything.
@@ -157,6 +157,7 @@ PopupCard {
         anchors.verticalCenter: parent.verticalCenter
         text: host.previewMonitor
           ? String(host.previewMonitor.name || "") + "  ·  " + host.previewMonitor.width + "×" + host.previewMonitor.height
+            + (host.previewScreen && host.previewScreen.scale !== 1 ? "  ·  " + host.previewScreen.scale + "×" : "")
           : ""
       }
       Caption {

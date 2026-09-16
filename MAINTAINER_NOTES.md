@@ -5,10 +5,10 @@ easy to lose between sessions; user-facing changes belong in `CHANGELOG.md`.
 
 ## Current state
 
-- Manifest version prepared in this tree: **3.2.0**.
+- Manifest version prepared in this tree: **3.2.1**.
 - Development branch: `main`.
-- 3.1.0, 3.1.1, and 3.2.0 were developed and verified against **Omarchy
-  4.0.3-1** on September 16, 2026. 3.0.1 was hardened against 4.0.2-1 on September 1, 2026.
+- 3.1.0 through 3.2.1 were developed and verified against **Omarchy 4.0.3-1**
+  on September 16, 2026. 3.0.1 was hardened against 4.0.2-1 on September 1, 2026.
 - The `v3.0.1` tag was created retroactively at the release commit when 3.1.0
   shipped; earlier the changelog entry existed without a tag.
 
@@ -101,17 +101,30 @@ occupancy, app matching, or preview capture to `workspace.toplevels.values`;
 that collection was observed to lag or omit sibling surfaces when one
 application owns multiple windows.
 
-Filter by `toplevelWorkspaceId()`, which prefers the toplevel's tracked
-`workspace` property and only falls back to `lastIpcObject.workspace.id`.
-Verified on 2026-09-16: a window opened after the shell starts has a correct
-`workspace` immediately, but its `lastIpcObject` is an empty stub (no
-address, workspace, class, or geometry) until Quickshell next runs `hyprctl
-clients`. Before 3.2.0 such windows were invisible to the plugin until a
-restart. `refreshToplevels()` is requested on `openwindow`, `movewindow(v2)`,
-`closewindow`, `changefloatingmode`, and `fullscreen` raw events and before a
-preview, which is what fills in class and geometry for auto icons and tiles.
-Reproduce with `setsid -f ghostty --title=demo -e btop` on a fresh workspace
-and check the editor row count.
+Filter by `toplevelWorkspaceId()`, which reads only `lastIpcObject`.
+Verified on 2026-09-16: a window opened after the shell starts has an empty
+`lastIpcObject` (no address, workspace, class, or geometry) until Quickshell
+next runs `hyprctl clients`. Before 3.2.0 such windows were invisible to the
+plugin until a restart. `refreshToplevels()` (a 40 ms debounced Timer around
+`Hyprland.refreshToplevels()`) is requested on `openwindow`,
+`movewindow(v2)`, `closewindow`, `changefloatingmode`, and `fullscreen` raw
+events and before a preview; that is what fills in workspace, class, and
+geometry for counts, auto icons, and tiles. Reproduce with
+`setsid -f ghostty --title=demo -e btop` on a fresh workspace and check the
+editor row count.
+
+**Never read `toplevel.workspace` (the object) inside bindings.** 3.2.0 did,
+and the shell segfaulted twice at startup inside
+`Qt::endPropertyUpdateGroup` while Quickshell re-parsed `j/clients` before
+`j/workspaces` had answered ("Workspace N requested before creation,
+performing early init with id -1" in the crash log). Cores: `coredumpctl list
+quickshell`, 2026-09-16 13:26 and 14:19. Reading `toplevel.address` (a
+string) is fine. 3.2.1 removed the object read; six consecutive restarts then
+ran clean. This is correlation plus a plausible mechanism, not a symbolized
+proof: Arch ships no Quickshell debug symbols.
+
+Preview geometry must use `Logic.logicalMonitor(previewMonitor)`: Hyprland's
+monitor width/height are physical pixels, window `at`/`size` are logical.
 
 ## Verification status
 

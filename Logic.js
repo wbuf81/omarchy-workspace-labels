@@ -275,8 +275,28 @@ function focusGeometry(items, focusedId, vertical, thickness) {
   return { x: 0, y: 0, width: 0, height: 0, visible: false }
 }
 
+// A monitor's geometry in the logical pixels Hyprland uses for window
+// positions. `hyprctl monitors` gives physical width/height plus scale and a
+// transform; odd transforms are 90/270 degree rotations.
+function logicalMonitor(monitor) {
+  if (!monitor || typeof monitor !== "object") return null
+  var scale = Number(monitor.scale)
+  if (!isFinite(scale) || scale <= 0) scale = 1
+  var w = Math.round((Number(monitor.width) || 0) / scale)
+  var h = Math.round((Number(monitor.height) || 0) / scale)
+  var rotated = (Math.floor(Number(monitor.transform) || 0) % 2) === 1
+  return {
+    x: Number(monitor.x) || 0,
+    y: Number(monitor.y) || 0,
+    width: rotated ? h : w,
+    height: rotated ? w : h,
+    scale: scale
+  }
+}
+
 if (typeof module !== "undefined") {
   module.exports = {
+    logicalMonitor: logicalMonitor,
     previewMode: previewMode,
     dominantClass: dominantClass,
     autoIconFor: autoIconFor,
