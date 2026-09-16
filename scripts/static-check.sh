@@ -7,7 +7,7 @@ cd "$project_dir"
 jq -e '
   .schemaVersion == 1 and
   .id == "io.github.wbuf81.workspace-labels" and
-  .version == "3.1.1" and
+  .version == "3.2.0" and
   .license == "MIT" and
   .kinds == ["bar-widget"] and
   .entryPoints.barWidget == "Workspaces.qml" and
@@ -17,7 +17,9 @@ jq -e '
   (.barWidget.defaults.pinned | length) == 5
 ' manifest.json >/dev/null
 
-for required in Workspaces.qml Logic.js README.md CHANGELOG.md CONTRIBUTING.md \
+for required in Workspaces.qml BarButton.qml EditorPanel.qml IconPicker.qml PreviewCard.qml \
+  WindowTile.qml Caption.qml Rule.qml Mark.qml BlockCursor.qml CornerFrame.qml \
+  FlipBoard.qml FlipStep.qml Logic.js README.md CHANGELOG.md CONTRIBUTING.md \
   MAINTAINER_NOTES.md LICENSE docs/bar.png docs/editor.png docs/picker.png \
   docs/preview.png docs/social-preview.png preview.png \
   assets/social/share-card-background.png; do
@@ -38,8 +40,12 @@ rg -q 'Hyprland\.toplevels\.values' Workspaces.qml
 # app icons must come straight from Quickshell's desktop-entry registry.
 rg -q 'DesktopEntries\.applications\.values' Workspaces.qml
 rg -q 'Logic\.appsForClasses' Workspaces.qml
-rg -q 'Logic\.barName' Workspaces.qml
-if rg -q 'shell\.appLibrary' Workspaces.qml; then
+rg -q 'Logic\.barName' BarButton.qml
+rg -q 'Logic\.previewMode' Workspaces.qml
+rg -q 'Logic\.displayLabel' Workspaces.qml
+rg -q 'Logic\.urgentAfter' Workspaces.qml
+rg -q 'Logic\.focusGeometry' Workspaces.qml
+if rg -q 'shell\.appLibrary' -- *.qml; then
   echo "Static check failed: shell.appLibrary is null for bar widgets on Omarchy 4.0.3" >&2
   exit 1
 fi
@@ -58,8 +64,11 @@ if [[ -z $qmlformat_bin && -x /usr/lib/qt6/bin/qmlformat ]]; then
   qmlformat_bin=/usr/lib/qt6/bin/qmlformat
 fi
 if [[ -n $qmlformat_bin ]]; then
-  "$qmlformat_bin" -n Workspaces.qml >/dev/null
+  for qml in *.qml; do "$qmlformat_bin" -n "$qml" >/dev/null; done
 fi
+# qmllint is deliberately not run: the `qs.Ui` / `qs.Commons` modules only
+# exist inside the running shell's engine, so every file reports unresolved
+# imports and the real errors would drown in that noise.
 
 if rg -n '(^|[^[:alpha:]])(TODO|FIXME|HACK)([^[:alpha:]]|$)' \
   --glob '*.qml' --glob '*.js' --glob '*.sh' --glob '!scripts/static-check.sh' .; then

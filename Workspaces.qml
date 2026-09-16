@@ -805,6 +805,7 @@ Panel {
     rowSpacing: root.vertical ? Style.space(2) : 0
 
     Repeater {
+      id: wsRepeater
       model: root.workspaceIds()
 
       BarButton {
@@ -833,6 +834,36 @@ Panel {
       }
       onWheelMoved: function(delta) { root.handleWheel(delta) }
     }
+  }
+
+  // The focus indicator: a hairline of accent that glides between workspace
+  // buttons along the bar's outer edge, instead of underlining the name.
+  function buttonGeometry() {
+    var out = []
+    for (var i = 0; i < wsRepeater.count; i++) {
+      var item = wsRepeater.itemAt(i)
+      if (!item) continue
+      out.push({ id: item.workspaceId, x: item.x, y: item.y, width: item.width, height: item.height })
+    }
+    return out
+  }
+
+  Rectangle {
+    id: focusBar
+    readonly property var geo: Logic.focusGeometry(
+      root.buttonGeometry(),
+      Hyprland.focusedWorkspace ? Hyprland.focusedWorkspace.id : 0,
+      root.vertical, Style.space(2))
+    x: geo.x
+    y: geo.y
+    width: geo.width
+    height: geo.height
+    visible: geo.visible
+    color: Color.accent
+    Behavior on x { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+    Behavior on y { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+    Behavior on width { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+    Behavior on height { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
   }
 
   // PopupCard.close() assigns `open` directly unless its owner has a close(),

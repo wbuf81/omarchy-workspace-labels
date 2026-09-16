@@ -9,13 +9,19 @@ plugin_id="io.github.wbuf81.workspace-labels"
 source_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 target_dir="$HOME/.config/omarchy/plugins/$plugin_id"
 enable=false
+restart=false
 
-if [[ ${1:-} == "--enable" ]]; then
-  enable=true
-elif [[ $# -gt 0 ]]; then
-  echo "Usage: $0 [--enable]" >&2
-  exit 2
-fi
+for arg in "$@"; do
+  case "$arg" in
+    --enable) enable=true ;;
+    # Omarchy 4.0.3 logs a reload after a sync but keeps the previously
+    # compiled QML, so source edits only show after a shell restart. The
+    # pause lets the hot-reload settle first; restarting mid-reload has
+    # segfaulted Quickshell.
+    --restart) restart=true ;;
+    *) echo "Usage: $0 [--enable] [--restart]" >&2; exit 2 ;;
+  esac
+done
 
 omarchy plugin validate "$source_dir"
 mkdir -p "$target_dir"
@@ -26,4 +32,10 @@ if "$enable"; then
   omarchy plugin enable "$plugin_id" --section left
 fi
 
-echo "Synced $plugin_id. Edit the repository, then run scripts/dev-sync.sh again."
+if "$restart"; then
+  sleep 4
+  omarchy restart shell
+  echo "Synced $plugin_id and restarted the shell."
+else
+  echo "Synced $plugin_id. Source edits need 'omarchy restart shell' (or pass --restart)."
+fi

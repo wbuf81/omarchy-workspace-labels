@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "io.github.wbuf81.workspace-labels",
   "name": "Workspace Labels",
-  "version": "3.1.1",
+  "version": "3.2.0",
   "author": "Wes (wbuf81)",
   "license": "MIT",
   "description": "Named workspaces with per-workspace icons — Nerd Font glyphs or real app icons — hover previews, and a + to add or remove workspaces.",

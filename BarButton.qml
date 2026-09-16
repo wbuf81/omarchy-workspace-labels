@@ -73,7 +73,6 @@ WidgetButton {
       visible: nameText.text !== ""
       text: Logic.barName(host.vertical, button.wsLabel.icon, button.wsLabel.name, button.workspaceId)
       textFormat: Text.PlainText
-      font.underline: button.focused
       anchors.verticalCenter: parent.verticalCenter
       color: button.inkColor
       font.family: button.fontFamily

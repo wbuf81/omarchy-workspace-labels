@@ -14,12 +14,41 @@ KeyboardPanel {
   required property var host
 
   focusTarget: keyCatcher
+
+  // RESET arms on the first click and only fires on a second within three
+  // seconds; the label says so, in the theme's urgent color.
+  property bool confirmingReset: false
+  function pressReset() {
+    if (panel.confirmingReset) {
+      panel.confirmingReset = false
+      resetArm.stop()
+      host.resetLabels()
+    } else {
+      panel.confirmingReset = true
+      resetArm.restart()
+    }
+  }
+  // Flip tiles share one small size everywhere in the panel.
+  readonly property real flipWidth: Style.space(11)
+  readonly property real flipHeight: Style.space(15)
   contentWidth: panel.fittedContentWidth(Style.space(420))
   contentHeight: panel.fittedContentHeight(panelColumn.implicitHeight, Style.space(600))
 
   PanelKeyCatcher {
     id: keyCatcher
     anchors.fill: parent
+
+    // KeyboardPanel's default property only takes Items, so the non-visual
+    // helpers live here.
+    Timer {
+      id: resetArm
+      interval: 3000
+      onTriggered: panel.confirmingReset = false
+    }
+    Connections {
+      target: panel.host
+      function onOpenedChanged() { panel.confirmingReset = false; resetArm.stop() }
+    }
     // Stand down while any field owns input, or typing a name would be eaten
     // as j/k/x navigation.
     blocked: host.focusedFields > 0
@@ -30,7 +59,7 @@ KeyboardPanel {
     onDeleteRequested: if (!host.showPicker && host.editorTarget > 0) host.removeWorkspace(host.editorTarget)
     onTextKey: function(t) {
       if (host.showPicker) return
-      if (t === "i" && host.editorTarget > 0) host.openPicker(host.editorTarget)
+      if ((t === "i" || t === "/") && host.editorTarget > 0) host.openPicker(host.editorTarget)
       else if (t === "a" || t === "+") host.addWorkspace()
     }
 
@@ -110,6 +139,12 @@ KeyboardPanel {
               font.bold: true
               font.letterSpacing: 1.8
             }
+
+            BlockCursor {
+              anchors.verticalCenter: parent.verticalCenter
+              blinking: host.opened
+              font.pixelSize: Style.font.title - 2
+            }
           }
 
           Caption {
@@ -142,12 +177,31 @@ KeyboardPanel {
             foreground: host.ink
             fontFamily: host.panelFont
           }
-          Caption {
+          // The readout: NOW, the focused number on flip tiles, its name.
+          Row {
             anchors.right: parent.right
-            anchors.baseline: labelsHeader.baseline
-            text: {
-              var focusedWs = Hyprland.focusedWorkspace
-              return focusedWs ? "now  " + host.pad(focusedWs.id) + "  " + host.displayFor(focusedWs.id).name : ""
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: Style.space(6)
+            readonly property int focusedId: Hyprland.focusedWorkspace ? Hyprland.focusedWorkspace.id : 0
+
+            Caption { anchors.verticalCenter: parent.verticalCenter; text: "now" }
+            FlipBoard {
+              anchors.verticalCenter: parent.verticalCenter
+              value: host.pad(parent.focusedId)
+              tileWidth: panel.flipWidth
+              tileHeight: panel.flipHeight
+              foreground: host.ink
+              accent: Color.accent
+              dim: host.dim
+              line: host.line
+              well: Util.alpha(host.ink, 0.06)
+              fontFamily: host.panelFont
+              animated: host.opened
+            }
+            Caption {
+              anchors.verticalCenter: parent.verticalCenter
+              color: host.ink
+              text: parent.focusedId > 0 ? host.displayFor(parent.focusedId).name : ""
             }
           }
         }
@@ -281,14 +335,47 @@ KeyboardPanel {
                     }
                   }
 
-                  Caption {
-                    Layout.preferredWidth: Style.space(64)
-                    horizontalAlignment: Text.AlignRight
-                    font.letterSpacing: 0.6
-                    text: editRow.live
-                      ? editRow.windows + (editRow.windows === 1 ? " window" : " windows")
-                      : "empty"
-                    color: editRow.live ? host.dim : host.faint
+                  // Window count on flip tiles, so a window arriving or
+                  // leaving while the panel is open reads like a departure
+                  // board updating.
+                  Item {
+                    Layout.preferredWidth: Style.space(92)
+                    Layout.preferredHeight: panel.flipHeight
+
+                    Row {
+                      anchors.right: parent.right
+                      anchors.verticalCenter: parent.verticalCenter
+                      spacing: Style.space(6)
+                      visible: editRow.live
+
+                      FlipBoard {
+                        anchors.verticalCenter: parent.verticalCenter
+                        value: host.pad(editRow.windows)
+                        tileWidth: panel.flipWidth
+                        tileHeight: panel.flipHeight
+                        foreground: host.ink
+                        accent: Color.accent
+                        dim: host.dim
+                        line: host.line
+                        well: Util.alpha(host.ink, 0.06)
+                        fontFamily: host.panelFont
+                        animated: host.opened
+                      }
+                      Caption {
+                        anchors.verticalCenter: parent.verticalCenter
+                        font.letterSpacing: 0.6
+                        text: editRow.windows === 1 ? "window" : "windows"
+                      }
+                    }
+
+                    Caption {
+                      anchors.right: parent.right
+                      anchors.verticalCenter: parent.verticalCenter
+                      visible: !editRow.live
+                      font.letterSpacing: 0.6
+                      text: "empty"
+                      color: host.faint
+                    }
                   }
 
                   PanelActionButton {
@@ -324,7 +411,7 @@ KeyboardPanel {
           elide: Text.ElideNone
           wrapMode: Text.WordWrap
           lineHeight: 1.35
-          text: "j/k move  ·  enter rename  ·  i icon\na add  ·  x remove  ·  esc close"
+          text: "j/k move  ·  enter rename  ·  i or / icon\na add  ·  x remove  ·  esc close"
         }
 
         Item {
@@ -350,13 +437,17 @@ KeyboardPanel {
             spacing: Style.space(6)
 
             Button {
-              text: "RESET"
+              text: panel.confirmingReset ? "SURE?" : "RESET"
+              tooltipText: panel.confirmingReset
+                ? "Click again to forget every label and pinned slot"
+                : "Forget all labels and pinned slots (asks once more)"
               bordered: true
+              selected: panel.confirmingReset
               foreground: host.ink
-              accent: Color.accent
+              accent: panel.confirmingReset ? Color.urgent : Color.accent
               fontFamily: host.panelFont
               fontSize: Style.font.caption
-              onClicked: host.resetLabels()
+              onClicked: panel.pressReset()
             }
 
             Button {

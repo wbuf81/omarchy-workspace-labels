@@ -1,4 +1,5 @@
 import QtQuick
+import Quickshell.Hyprland
 import qs.Ui
 import qs.Commons
 
@@ -59,6 +60,7 @@ PopupCard {
         color: host.ink
         font.bold: true
         text: host.pad(host.hoverPreviewId) + "  " + host.displayFor(host.hoverPreviewId).name
+          + (Hyprland.focusedWorkspace && Hyprland.focusedWorkspace.id === host.hoverPreviewId ? "  ·  now" : "")
       }
       Caption {
         id: previewCount
@@ -89,6 +91,31 @@ PopupCard {
       readonly property real originX: host.previewMonitor ? host.previewMonitor.x : 0
       readonly property real originY: host.previewMonitor ? host.previewMonitor.y : 0
 
+      // Instrument-console chrome: a quiet reference grid under the windows,
+      // edge ticks at the midpoints, corner frames above everything.
+      Repeater {
+        model: 7
+        Rectangle {
+          required property int index
+          x: Math.round(screenRect.width * (index + 1) / 8)
+          y: 0
+          width: 1
+          height: screenRect.height
+          color: Util.alpha(host.ink, 0.05)
+        }
+      }
+      Repeater {
+        model: 3
+        Rectangle {
+          required property int index
+          x: 0
+          y: Math.round(screenRect.height * (index + 1) / 4)
+          width: screenRect.width
+          height: 1
+          color: Util.alpha(host.ink, 0.05)
+        }
+      }
+
       Repeater {
         model: host.previewWindows
 
@@ -101,6 +128,18 @@ PopupCard {
           originY: screenRect.originY
           mode: card.host.previewMode
         }
+      }
+
+      // Edge ticks.
+      Rectangle { x: Math.round(screenRect.width / 2) - 2; y: 0; width: 4; height: 3; color: Util.alpha(Color.accent, 0.6) }
+      Rectangle { x: Math.round(screenRect.width / 2) - 2; y: screenRect.height - 3; width: 4; height: 3; color: Util.alpha(Color.accent, 0.6) }
+      Rectangle { x: 0; y: Math.round(screenRect.height / 2) - 2; width: 3; height: 4; color: Util.alpha(Color.accent, 0.6) }
+      Rectangle { x: screenRect.width - 3; y: Math.round(screenRect.height / 2) - 2; width: 3; height: 4; color: Util.alpha(Color.accent, 0.6) }
+
+      CornerFrame {
+        anchors.fill: parent
+        color: Util.alpha(Color.accent, 0.75)
+        arm: Style.space(9)
       }
     }
 
