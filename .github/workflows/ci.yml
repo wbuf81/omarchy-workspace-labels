@@ -13,6 +13,8 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Install release-check dependencies
-        run: sudo apt-get update && sudo apt-get install -y imagemagick jq ripgrep
+        run: sudo apt-get update && sudo apt-get install -y imagemagick jq ripgrep qt6-declarative-dev-tools
       - name: Run static and workspace-state checks
-        run: ./scripts/static-check.sh
+        # qmlformat comes from qt6-declarative-dev-tools so every QML file is
+        # parsed in CI, not only on an Omarchy machine.
+        run: ./scripts/static-check.sh < /dev/null

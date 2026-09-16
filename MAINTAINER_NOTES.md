@@ -5,9 +5,9 @@ easy to lose between sessions; user-facing changes belong in `CHANGELOG.md`.
 
 ## Current state
 
-- Manifest version prepared in this tree: **3.2.1**.
+- Manifest version prepared in this tree: **3.2.2**.
 - Development branch: `main`.
-- 3.1.0 through 3.2.1 were developed and verified against **Omarchy 4.0.3-1**
+- 3.1.0 through 3.2.2 were developed and verified against **Omarchy 4.0.3-1**
   on September 16, 2026. 3.0.1 was hardened against 4.0.2-1 on September 1, 2026.
 - The `v3.0.1` tag was created retroactively at the release commit when 3.1.0
   shipped; earlier the changelog entry existed without a tag.
@@ -125,6 +125,10 @@ proof: Arch ships no Quickshell debug symbols.
 
 Preview geometry must use `Logic.logicalMonitor(previewMonitor)`: Hyprland's
 monitor width/height are physical pixels, window `at`/`size` are logical.
+`Logic.previewLayout(snapshots, 12)` does the filtering, ordering, and cap;
+note that in QML `lastIpcObject.at`/`.size` are Qt array-likes, not JS
+Arrays, so the logic tests for an indexable pair rather than
+`Array.isArray` (a regression caught live on 2026-09-16 before release).
 
 ## Verification status
 
@@ -137,16 +141,36 @@ Automated checks completed for 3.1.0 on September 16, 2026:
 - Manifest, release asset, shell-script, integration-contract (including the
   Quickshell desktop-entry path), and unresolved marker checks.
 
-Interactive checks completed on 4.0.3-1 with the shell running (3.2.0): app
-icons in the bar and picker, auto icon on an icon-less workspace, ON THIS
-WORKSPACE matching, preview in `capture` (thumbnails with badges), `map`
-(icon blocks), and `off`, the sliding focus bar caught mid-slide, flip
+Interactive checks completed on 4.0.3-1 with the shell running (3.2.0 to
+3.2.2): app icons in the bar and picker, auto icon on an icon-less workspace,
+ON THIS WORKSPACE matching, preview in `capture` (thumbnails with badges),
+`map` (icon blocks), and `off`, the sliding focus bar caught mid-slide, flip
 readouts caught mid-flip, the block cursor blinking, grid/ticks/corners on the
 preview, the `send` verb dispatching without error (dry run onto the window's
-own workspace), and a window spawned after the restart being counted,
-previewed, and auto-iconed on a fresh workspace. Not exercised live: an actual urgent window (no tool
-on the machine raises urgency; the set logic is unit-tested), a real
-middle-click, and RESET's second click.
+own workspace), a window spawned after a restart being counted, previewed,
+and auto-iconed, closing a window while its preview is open (card updates
+from 2 to 1 window, no crash), a theme switch (`omarchy theme set catppuccin`
+and back) re-inking the open editor live, IPC `openFor` landing on the bar of
+a focused headless output, and `scripts/restart-soak.sh 10` passing.
+
+**Urgent state, what is and is not verified.** Hyprland's event socket
+(`socat -u UNIX-CONNECT:$XDG_RUNTIME_DIR/hypr/$HYPRLAND_INSTANCE_SIGNATURE/.socket2.sock -`)
+shows `urgent>>ADDR` on every new window and on a terminal bell (Ghostty's
+default `bell-features` includes `attention`). On Omarchy's defaults
+(`misc.focus_on_activate = true`) the compositor focuses the ringing window
+at once, so `activewindowv2` follows and the plugin clears the flag, which is
+the correct outcome. The urgent color therefore only ever shows for apps
+whose activation does not steal focus (Omarchy ships such a rule for
+Telegram). A runtime `hl.window_rule` with `focus_on_activate = false` did
+not prevent the focus jump in testing, so the colored state has still not
+been seen on screen; the set logic is unit-tested. Not exercised live: a real
+middle-click and RESET's second click.
+
+**Tooling.** `scripts/restart-soak.sh N [settle]` restarts the shell and
+fails on any new Quickshell core dump; run it before tagging.
+`scripts/dev-sync.sh --restart` fails if a core dump appears within ten
+seconds. CI installs `qt6-declarative-dev-tools` so every QML file is parsed
+by qmlformat on push; the static check refuses to run in CI without it.
 
 Vertical bar and headless multi-monitor results from 3.1.1 still apply (see
 below); 3.2.0 was not re-run in those configurations.

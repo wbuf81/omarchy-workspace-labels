@@ -7,7 +7,7 @@ cd "$project_dir"
 jq -e '
   .schemaVersion == 1 and
   .id == "io.github.wbuf81.workspace-labels" and
-  .version == "3.2.1" and
+  .version == "3.2.2" and
   .license == "MIT" and
   .kinds == ["bar-widget"] and
   .entryPoints.barWidget == "Workspaces.qml" and
@@ -54,17 +54,20 @@ if rg -q 'workspace\.toplevels\.values|ws\.toplevels\.values' Workspaces.qml; th
   exit 1
 fi
 
-bash -n scripts/build-social-card.sh scripts/dev-sync.sh scripts/release-check.sh scripts/static-check.sh
+bash -n scripts/build-social-card.sh scripts/dev-sync.sh scripts/release-check.sh scripts/restart-soak.sh scripts/static-check.sh
 node tests/logic.test.js
 
 # qmlformat parses the complete file before producing output. It is available
 # on Omarchy but intentionally optional in the portable GitHub Actions job.
 qmlformat_bin="$(command -v qmlformat || true)"
-if [[ -z $qmlformat_bin && -x /usr/lib/qt6/bin/qmlformat ]]; then
-  qmlformat_bin=/usr/lib/qt6/bin/qmlformat
-fi
+for candidate in /usr/lib/qt6/bin/qmlformat /usr/lib/x86_64-linux-gnu/qt6/bin/qmlformat /usr/lib/qt6/libexec/qmlformat; do
+  if [[ -z $qmlformat_bin && -x $candidate ]]; then qmlformat_bin=$candidate; fi
+done
 if [[ -n $qmlformat_bin ]]; then
   for qml in *.qml; do "$qmlformat_bin" -n "$qml" >/dev/null; done
+elif [[ -n ${CI:-} ]]; then
+  echo "Static check failed: qmlformat is required in CI so every QML file is parsed" >&2
+  exit 1
 fi
 # qmllint is deliberately not run: the `qs.Ui` / `qs.Commons` modules only
 # exist inside the running shell's engine, so every file reports unresolved

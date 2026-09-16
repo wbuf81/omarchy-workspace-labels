@@ -1,5 +1,25 @@
 # Changelog
 
+## 3.2.2
+
+- **More of the plugin is now tested under Node.** Preview layout (mapped and
+  visible windows only, tiled before floating, capped at twelve), window
+  address normalization, and monitor geometry at 1.5× and 2× moved into the
+  logic module with tests, alongside a test for auto icons changing as apps
+  come and go.
+- **Release tooling learned from this week's crashes.** `scripts/restart-soak.sh`
+  restarts the shell N times and fails if Quickshell dumps core;
+  `scripts/dev-sync.sh --restart` now reports a core dump within ten seconds
+  of the restart; GitHub Actions parses every QML file with qmlformat instead
+  of only the Node suite.
+- Verified live on Omarchy 4.0.3: IPC verbs open the editor on the focused
+  monitor's bar (headless second output), closing a window while its preview
+  is open updates the card without incident, a theme switch re-inks the open
+  editor, and ten consecutive shell restarts ran clean.
+- README gained a troubleshooting note about the harmless "Handler was
+  registered but will not be used" warning the shell logs once per bar
+  instance.
+
 ## 3.2.1
 
 - **Fixed shell crashes at startup introduced in 3.2.0.** The 3.2.0 fix for

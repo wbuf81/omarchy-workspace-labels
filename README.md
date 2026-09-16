@@ -245,6 +245,24 @@ the previously compiled QML, so a restart is needed after every source edit;
 settings edits still apply live. Let the sync settle for a few seconds before
 restarting.
 
+## Troubleshooting
+
+- **`Handler was registered but will not be used because another handler is
+  registered for target io.github.wbuf81.workspace-labels`** in the shell log
+  is expected once per extra bar instance (a second monitor, or a bar
+  position change). Quickshell allows one IPC handler per target; the first
+  instance owns it and forwards verbs to the bar on the focused monitor. Every
+  built-in Omarchy widget logs the same line.
+- **Previews look empty or padded** on a scaled display: update to 3.2.1 or
+  later, which scales against the monitor's logical size.
+- **A workspace shows as empty right after opening a window**: the plugin asks
+  Quickshell to refresh its window list on every window event; if that ever
+  stalls, `omarchy restart shell` resyncs. Please report it with the Omarchy
+  and Hyprland versions.
+- **The shell crashed within ten seconds of a restart** (Omarchy shows a
+  "Process crashed" notification): run `./scripts/restart-soak.sh 10` from a
+  checkout and include `coredumpctl list quickshell` in a bug report.
+
 ## Validate and test
 
 Workspace selection and add/remove transitions live in `Logic.js`, the same
@@ -253,6 +271,7 @@ module imported by the QML widget. They run under Node without a compositor.
 ```sh
 ./scripts/static-check.sh   # manifest, assets, QML parse, scripts, state tests
 ./scripts/release-check.sh  # all of the above + Omarchy's native validator
+./scripts/restart-soak.sh   # restart the shell 10 times; fail on any core dump
 ```
 
 GitHub Actions runs the portable suite on every push and pull request. The

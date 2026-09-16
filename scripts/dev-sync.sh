@@ -33,9 +33,18 @@ if "$enable"; then
 fi
 
 if "$restart"; then
+  cores_before="$(coredumpctl list quickshell --no-pager 2>/dev/null | grep -c '/usr/bin/quickshell' || true)"
   sleep 4
   omarchy restart shell
-  echo "Synced $plugin_id and restarted the shell."
+  # A startup crash relaunches the shell silently apart from a desktop
+  # notification; surface it here where the edit that caused it is visible.
+  sleep 10
+  cores_after="$(coredumpctl list quickshell --no-pager 2>/dev/null | grep -c '/usr/bin/quickshell' || true)"
+  if [[ "$cores_after" -gt "$cores_before" ]]; then
+    echo "Synced $plugin_id, but Quickshell dumped core on restart. See: coredumpctl list quickshell" >&2
+    exit 1
+  fi
+  echo "Synced $plugin_id and restarted the shell (no core dump within 10 s)."
 else
   echo "Synced $plugin_id. Source edits need 'omarchy restart shell' (or pass --restart)."
 fi

@@ -294,8 +294,51 @@ function logicalMonitor(monitor) {
   }
 }
 
+// Hyprland spells window addresses two ways: events carry bare lowercase hex,
+// `hyprctl clients` carries a 0x prefix. One key for both.
+function normalizedAddress(value) {
+  var text = String(value === undefined || value === null ? "" : value).trim().toLowerCase()
+  return text.indexOf("0x") === 0 ? text.substring(2) : text
+}
+
+// The windows a preview draws, from the IPC snapshots of one workspace's
+// clients: only mapped, visible, positively sized ones, tiled before floating
+// so floaters stack on top, capped so a pathological workspace cannot stall
+// the bar with captures.
+function isPair(value) {
+  return value !== null && value !== undefined && typeof value === "object"
+    && Number(value.length) >= 2 && value[0] !== undefined && value[1] !== undefined
+}
+
+function previewLayout(clients, limit) {
+  var list = Array.isArray(clients) ? clients : []
+  var out = []
+  for (var i = 0; i < list.length; i++) {
+    var o = list[i]
+    // `at`/`size` arrive as JS arrays under Node but as Qt array-likes in
+    // QML, so test for indexable pairs rather than Array.isArray.
+    if (!o || !isPair(o.at) || !isPair(o.size)) continue
+    if (o.hidden || o.mapped === false) continue
+    var w = Number(o.size[0]), h = Number(o.size[1])
+    if (!(w > 0) || !(h > 0)) continue
+    out.push({
+      address: String(o.address || ""),
+      ax: Number(o.at[0]) || 0, ay: Number(o.at[1]) || 0,
+      aw: w, ah: h,
+      floating: !!o.floating,
+      cls: String(o["class"] || ""),
+      title: String(o.title || "")
+    })
+  }
+  out.sort(function(a, b) { return (a.floating ? 1 : 0) - (b.floating ? 1 : 0) })
+  var cap = Math.max(0, Math.floor(Number(limit) || 0))
+  return cap > 0 ? out.slice(0, cap) : out
+}
+
 if (typeof module !== "undefined") {
   module.exports = {
+    normalizedAddress: normalizedAddress,
+    previewLayout: previewLayout,
     logicalMonitor: logicalMonitor,
     previewMode: previewMode,
     dominantClass: dominantClass,

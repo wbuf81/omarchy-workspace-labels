@@ -560,10 +560,7 @@ Panel {
   // ---------------------------------------------------------------------
   property var urgentAddresses: []
 
-  function normalizedAddress(value) {
-    var s = String(value || "").trim().toLowerCase()
-    return s.indexOf("0x") === 0 ? s.substring(2) : s
-  }
+  function normalizedAddress(value) { return Logic.normalizedAddress(value) }
 
   function focusedAddresses() {
     var focusedWs = Hyprland.focusedWorkspace
@@ -765,25 +762,18 @@ Panel {
     if (!ws) return []
 
     var all = root.toplevelsForWorkspace(root.hoverPreviewId)
-    var out = []
-    for (var i = 0; i < all.length; i++) {
-      var o = all[i].lastIpcObject
-      if (!o || !o.at || !o.size) continue
-      if (o.hidden || o.mapped === false) continue
-      if (o.size[0] <= 0 || o.size[1] <= 0) continue
-      out.push({
-        toplevel: all[i],
-        ax: o.at[0], ay: o.at[1],
-        aw: o.size[0], ah: o.size[1],
-        floating: !!o.floating,
-        cls: String(o["class"] || ""),
-        title: String(o.title || "")
-      })
+    var snapshots = []
+    for (var i = 0; i < all.length; i++) snapshots.push(all[i].lastIpcObject)
+    // One capture per window; the cap keeps a pathological workspace from
+    // stalling the bar. The layout rule itself is tested under Node.
+    var layout = Logic.previewLayout(snapshots, 12)
+    for (var k = 0; k < layout.length; k++) {
+      for (var t = 0; t < all.length; t++) {
+        var ipc = all[t].lastIpcObject
+        if (ipc && String(ipc.address || "") === layout[k].address) { layout[k].toplevel = all[t]; break }
+      }
     }
-    out.sort(function(a, b) { return (a.floating ? 1 : 0) - (b.floating ? 1 : 0) })
-    // One capture per window; cap it so a pathological workspace can't stall
-    // the bar.
-    return out.slice(0, 12)
+    return layout
   }
 
   function requestPreview(id, anchor) {
