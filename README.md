@@ -13,7 +13,8 @@
 
 Stock Omarchy gives you `1 2 3 4 5`. Workspace Labels turns that strip into a
 compact, editable map of your desktop: names, Nerd Font glyphs or real app
-icons, instant switching, and a hover preview that shows where every window is.
+icons, auto icons for anything you did not name, instant switching, and a
+hover preview that shows where every window is.
 
 Everything is edited in place. No hand-maintained config file and no shell
 restart after changing a label.
@@ -39,8 +40,15 @@ restart after changing a label.
   than an approximation. Apps on the workspace being edited are offered first.
   Icons come straight from Quickshell's desktop-entry registry, so they work
   under Omarchy 4.0.3's scoped plugin API.
+- **Auto icons.** A workspace you never labeled shows the icon of the app
+  running on it, live. Name it or pick an icon and your choice wins.
+- **Urgent and focus, quietly.** A hairline of accent glides along the bar to
+  the focused workspace; a window demanding attention colors its workspace in
+  the theme's urgent color.
 - **Fast enough to forget about.** Window captures are single-shot, delayed
   until a deliberate hover, and capped at twelve—not continuously streamed.
+- **Private when you want it.** Set `previewMode` to `map` and the preview
+  draws each window as a block with its app icon, never any screen content.
 - **Keyboard friendly.** Navigate, rename, choose an icon, add, and remove
   without leaving the home row.
 - **Theme and layout aware.** Horizontal bars show icon and name; vertical bars
@@ -94,7 +102,8 @@ pins. Nothing is written outside that entry.
 | --- | --- |
 | Hover a workspace | Preview its windows after ~0.45 seconds, with window count, monitor, and floating state |
 | Left-click a workspace | Switch to it |
-| Right- or middle-click a workspace | Open the editor on that row |
+| Right-click a workspace | Open the editor on that row |
+| Middle-click a workspace | Send the focused window there, without following |
 | Scroll over the widget | Previous or next visible workspace |
 | Click `+` | Pin, focus, and name the lowest free workspace |
 | `SUPER + ALT + W` | Toggle the editor with the optional binding below |
@@ -105,10 +114,13 @@ Inside the editor:
 | --- | --- |
 | `j` `k` or arrows | Move the row cursor |
 | `Enter` | Rename the highlighted workspace |
-| `i` | Open its icon picker |
+| `i` or `/` | Open its icon picker |
 | `a` | Add the lowest free workspace |
 | `x` | Remove the highlighted empty workspace |
 | `Esc` | Leave the picker, then close the panel |
+
+**RESET** asks once more: it arms on the first click and only fires on a
+second click within three seconds.
 
 ## Adding and removing is deliberately conservative
 
@@ -164,7 +176,9 @@ Settings are stored inline under this widget's layout entry in
 | Key | Type | Meaning |
 | --- | --- | --- |
 | `labels` | object | Workspace number to `{icon, name}`. `icon` is a glyph or `app:<icon-name>`. |
-| `hoverPreview` | boolean | Single-shot hover previews; default `true`. |
+| `previewMode` | string | `capture` (window screenshots, default), `map` (icon blocks, no screen content), or `off`. |
+| `autoIcons` | boolean | Icon-less workspaces borrow the running app's icon; default `true`. |
+| `hoverPreview` | boolean | Legacy. Only read while `previewMode` is unset; `false` means off. |
 | `pinned` | array | Empty workspace numbers kept in the bar; managed by add/remove. |
 | `minWorkspaces` | integer | Legacy fallback that seeds `1..N` only while `pinned` is unset. |
 
@@ -186,6 +200,7 @@ omarchy-shell io.github.wbuf81.workspace-labels next
 omarchy-shell io.github.wbuf81.workspace-labels prev
 omarchy-shell io.github.wbuf81.workspace-labels preview 3
 omarchy-shell io.github.wbuf81.workspace-labels unpreview
+omarchy-shell io.github.wbuf81.workspace-labels send 3      # focused window -> workspace 3
 omarchy-shell io.github.wbuf81.workspace-labels reset
 ```
 
@@ -195,8 +210,8 @@ For a keyboard toggle, add this to `~/.config/hypr/bindings.lua`:
 o.bind("SUPER + ALT + W", "Workspace labels", "omarchy-shell io.github.wbuf81.workspace-labels toggleEditor")
 ```
 
-On multiple monitors, the editor opens only on the bar instance you invoked,
-matching Omarchy's built-in wifi, clock, and volume panels.
+On multiple monitors, a right-click opens the editor on the bar you clicked,
+and the IPC verbs open it on the bar of the focused monitor.
 
 ## Edge cases already handled
 
@@ -221,7 +236,7 @@ use the copy-and-rescan helper:
 
 ```sh
 ./scripts/dev-sync.sh --enable  # first run
-./scripts/dev-sync.sh           # after later edits
+./scripts/dev-sync.sh --restart # after later edits: sync, settle, restart the shell
 ```
 
 If the shell watcher reports a change but the widget still looks stale, run
@@ -252,7 +267,9 @@ Before a release, manually sanity-check:
 - try to remove tiled, floating, and multi-window occupied workspaces;
 - close the last window, then remove the now-empty workspace;
 - rename and change icons rapidly, restart the shell, and confirm persistence;
-- preview one-window, tiled, floating, and multi-window workspaces;
+- preview one-window, tiled, floating, and multi-window workspaces in
+  `capture` and `map` modes;
+- clear a workspace's icon and confirm it borrows the running app's icon;
 - test one horizontal and one vertical bar;
 - test each connected monitor, then disable, re-enable, update, and remove.
 
@@ -260,7 +277,12 @@ Before a release, manually sanity-check:
 
 | File | Responsibility |
 | --- | --- |
-| `Workspaces.qml` | Bar widget, editor, icon picker, previews, persistence, and IPC |
+| `Workspaces.qml` | Settings, labels/pins/auto-icon model, urgent tracking, preview state, IPC, bar row |
+| `BarButton.qml` | One workspace in the bar: icon, name, urgent color, clicks and wheel |
+| `EditorPanel.qml`, `IconPicker.qml` | The station-board editor and its inline icon picker |
+| `PreviewCard.qml`, `WindowTile.qml` | Hover preview card and one window inside it (capture or map) |
+| `Caption.qml`, `Rule.qml`, `Mark.qml`, `BlockCursor.qml`, `CornerFrame.qml` | Shared station pieces |
+| `FlipBoard.qml`, `FlipStep.qml` | Stepped split-flap tiles for the readouts, shared with Idle Screen Counter |
 | `Logic.js` | Tested normalization, visible/editor unions, and add/remove transitions |
 | `manifest.json` | Omarchy metadata, defaults, settings schema, and entry point |
 | `tests/logic.test.js` | Executable workspace-state regression coverage |

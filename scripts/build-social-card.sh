@@ -15,7 +15,7 @@ trap 'rm -rf -- "$scratch_dir"' EXIT
 
 # Frame only real running-plugin captures. The generated background remains an
 # atmospheric layer and never pretends to be application UI.
-magick docs/preview.png -crop 345x215+28+26 +repage -resize 470x \
+magick docs/preview.png -crop 424x258+126+37 +repage -resize 470x \
   -bordercolor '#6fe7f2' -border 2x2 \
   \( +clone -background '#000000' -shadow 70x14+0+16 \) \
   +swap -background none -layers merge +repage \

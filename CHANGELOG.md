@@ -1,5 +1,53 @@
 # Changelog
 
+## 3.2.0
+
+**Reliable previews, auto icons, and more of the station-board character.**
+
+- **Fixed: windows opened after the shell started were invisible to the
+  plugin.** Quickshell fills a new toplevel's IPC snapshot lazily, so its
+  workspace, class, and geometry were missing until something else refreshed
+  it; the bar showed the workspace as empty, previews skipped the window, and
+  auto icons could not see it. The plugin now reads the tracked workspace and
+  address properties first and asks Quickshell to refresh toplevels on window
+  open, move, close, float, and fullscreen events and before a preview.
+- **Preview modes.** New `previewMode` setting: `capture` (single-shot window
+  screenshots, the old behavior), `map` (each window drawn as a block with its
+  app icon, never any screen content), or `off`. A capture that yields nothing
+  now falls back to the map block instead of a black tile, and captured windows
+  carry a small app-icon badge so a wall of text still reads. The legacy
+  `hoverPreview: false` still means off. The `preview` IPC verb is an explicit
+  request and keeps working in `off` mode, drawing the map.
+- **Auto icons.** A workspace with no icon of its own shows the icon of the
+  app running on it, chosen by the most common window class. The editor dims
+  a borrowed icon so you can tell it from one you picked. `autoIcons: false`
+  turns it off.
+- **Urgent workspaces** light up in the theme's urgent color, driven by
+  Hyprland's urgent events and cleared when the window is activated, closed,
+  or its workspace focused.
+- **Middle-click sends the focused window** to that workspace without
+  following. New IPC verb: `send <id>`. Right-click still opens the editor.
+- **Sliding focus bar.** The focused workspace is marked by a hairline of
+  accent that glides along the bar's edge instead of an underline.
+- **Instrument-console preview.** The screen well gets a quiet reference
+  grid, edge ticks, and corner frames; the header says `· now` on the focused
+  workspace.
+- **Block cursor and flip readouts** in the editor: a blinking `█` after the
+  title, and the focused workspace number plus each row's window count on
+  stepped split-flap tiles that flip when values change.
+- **Two-step reset.** RESET arms on the first click (`SURE?` in the urgent
+  color) and fires only on a second click within three seconds.
+- `/` opens the icon picker for the highlighted row, alongside `i`.
+- IPC verbs act on the bar instance on the focused monitor.
+- The picker hides apps whose icon no installed theme can resolve.
+- The widget is split into focused files: `BarButton`, `EditorPanel`,
+  `IconPicker`, `PreviewCard`, `WindowTile`, the shared `Caption`, `Rule`,
+  `Mark`, `BlockCursor`, `CornerFrame`, and the `FlipBoard`/`FlipStep` tiles
+  shared with Idle Screen Counter. `Workspaces.qml` keeps the model, settings,
+  and IPC.
+- `scripts/dev-sync.sh --restart` restarts the shell after a sync, since
+  Omarchy 4.0.3 does not reload changed QML live.
+
 ## 3.1.1
 
 - Vertical bars: a workspace with a name but no icon showed the whole name

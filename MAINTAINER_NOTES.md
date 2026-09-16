@@ -5,10 +5,10 @@ easy to lose between sessions; user-facing changes belong in `CHANGELOG.md`.
 
 ## Current state
 
-- Manifest version prepared in this tree: **3.1.1**.
+- Manifest version prepared in this tree: **3.2.0**.
 - Development branch: `main`.
-- 3.1.0 and 3.1.1 were developed and verified against **Omarchy 4.0.3-1** on
-  September 16, 2026. 3.0.1 was hardened against 4.0.2-1 on September 1, 2026.
+- 3.1.0, 3.1.1, and 3.2.0 were developed and verified against **Omarchy
+  4.0.3-1** on September 16, 2026. 3.0.1 was hardened against 4.0.2-1 on September 1, 2026.
 - The `v3.0.1` tag was created retroactively at the release commit when 3.1.0
   shipped; earlier the changelog entry existed without a tag.
 
@@ -31,20 +31,48 @@ built in `shell.qml`). What matters for this plugin:
   do apply live. Wait a few seconds after a sync before restarting; a restart
   during the reload has segfaulted Quickshell in the sibling plugin.
 
+## File map and the host/child contract
+
+`Workspaces.qml` is the manifest entry point and the only file that owns
+state: settings plumbing, labels/pins, auto icons, desktop entries, urgent
+tracking, preview state, IPC, and the bar row with the sliding focus bar.
+Every visual child (`BarButton`, `EditorPanel`, `IconPicker`, `PreviewCard`,
+`WindowTile`) takes `required property var host` and reads model state, the
+palette (`ink`, `dim`, `faint`, `line`, `well`, `screenWell`, `panelFont`),
+and `pad()` from it. Children never persist anything; they call `host.*`
+mutators. Same-directory implicit imports resolve the sibling types; there is
+no qmldir and no singleton.
+
+`KeyboardPanel`'s default property only accepts Items, so a `Timer` or
+`Connections` at the root of `EditorPanel` fails with "Cannot assign object of
+type QQmlTimer to list property contentItem". Put non-visual helpers inside
+the `PanelKeyCatcher`.
+
+Urgency has no property on Quickshell's toplevels; it is tracked from
+`Hyprland.rawEvent` (`urgent`, `activewindowv2`, `closewindow`) with addresses
+normalized without the `0x` prefix, and pruned against the focused workspace.
+
+`FlipBoard.qml`/`FlipStep.qml` are copies from Idle Screen Counter (same
+author, MIT), reduced to the stepped style. Keep them pure QtQuick.
+
 ## Design language
 
-The editor, picker, and hover card were redrawn on September 16, 2026 in the
-flat monospace "station board" language shared with Idle Screen Counter (its
-`Panel.qml` is the reference). Keep to it:
+The editor, picker, hover card, and bar were drawn in the flat monospace
+"station board" language shared with Idle Screen Counter (its `Panel.qml` is
+the reference) and borrow OmaFinance's instrument-console details for the
+preview. Keep to it:
 
-- Palette on `root`: `ink` (popup text), `dim` 0.55, `faint` 0.3, `line` 0.14,
-  `well` 0.035, `screenWell` (darker popup background), plus `Color.accent`.
-- `Caption` (uppercase, letter-spaced, dim), `Rule` (1px `line`), and `Mark`
-  (steps(1) blinking accent square) are inline components; reuse them.
+- Palette on `host`: `ink` (popup text), `dim` 0.55, `faint` 0.3, `line` 0.14,
+  `well` 0.035, `screenWell` (darker popup background), plus `Color.accent`
+  for focus/live/selected and `Color.urgent` for urgent only.
+- `Caption` (uppercase, letter-spaced, dim), `Rule` (1px `line`), `Mark`
+  (steps(1) blinking accent square), `BlockCursor` (blinking `█`), and
+  `CornerFrame` are standalone files; reuse them.
 - Rows are separated by `Rule`s, indices are zero-padded via `pad()`, and the
   keyboard cursor is a `well` fill plus a 2px accent bar at the left edge.
+- Numbers that change while the panel is open sit on `FlipBoard` tiles.
 - Buttons are `bordered` with `fontSize: Style.font.caption` and uppercase
-  text; the primary action is `selected: true`.
+  text; the primary action is `selected: true`; destructive actions arm first.
 - Honor `Style.cornerRadius` as-is. Never add radius, cards, or friendly copy.
 
 ## Workspace-state contract
@@ -68,10 +96,22 @@ The invariants are:
 
 ## Toplevel contract
 
-Use the complete `Hyprland.toplevels.values` registry and filter each client's
-`lastIpcObject.workspace.id`. Do not revert occupancy, app matching, or preview
-capture to `workspace.toplevels.values`; that collection was observed to lag or
-omit sibling surfaces when one application owns multiple windows.
+Use the complete `Hyprland.toplevels.values` registry. Do not revert
+occupancy, app matching, or preview capture to `workspace.toplevels.values`;
+that collection was observed to lag or omit sibling surfaces when one
+application owns multiple windows.
+
+Filter by `toplevelWorkspaceId()`, which prefers the toplevel's tracked
+`workspace` property and only falls back to `lastIpcObject.workspace.id`.
+Verified on 2026-09-16: a window opened after the shell starts has a correct
+`workspace` immediately, but its `lastIpcObject` is an empty stub (no
+address, workspace, class, or geometry) until Quickshell next runs `hyprctl
+clients`. Before 3.2.0 such windows were invisible to the plugin until a
+restart. `refreshToplevels()` is requested on `openwindow`, `movewindow(v2)`,
+`closewindow`, `changefloatingmode`, and `fullscreen` raw events and before a
+preview, which is what fills in class and geometry for auto icons and tiles.
+Reproduce with `setsid -f ghostty --title=demo -e btop` on a fresh workspace
+and check the editor row count.
 
 ## Verification status
 
@@ -84,28 +124,35 @@ Automated checks completed for 3.1.0 on September 16, 2026:
 - Manifest, release asset, shell-script, integration-contract (including the
   Quickshell desktop-entry path), and unresolved marker checks.
 
-Interactive checks completed on 4.0.3-1 with the shell running: app icons in
-the bar and picker, ON THIS WORKSPACE matching for Ghostty and Brave, the
-redesigned editor, picker, and hover card on a horizontal top bar.
+Interactive checks completed on 4.0.3-1 with the shell running (3.2.0): app
+icons in the bar and picker, auto icon on an icon-less workspace, ON THIS
+WORKSPACE matching, preview in `capture` (thumbnails with badges), `map`
+(icon blocks), and `off`, the sliding focus bar caught mid-slide, flip
+readouts caught mid-flip, the block cursor blinking, grid/ticks/corners on the
+preview, the `send` verb dispatching without error (dry run onto the window's
+own workspace), and a window spawned after the restart being counted,
+previewed, and auto-iconed on a fresh workspace. Not exercised live: an actual urgent window (no tool
+on the machine raises urgency; the set logic is unit-tested), a real
+middle-click, and RESET's second click.
+
+Vertical bar and headless multi-monitor results from 3.1.1 still apply (see
+below); 3.2.0 was not re-run in those configurations.
 
 Vertical bar (`omarchy bar position left`, 3.1.1): app icons, glyphs, and the
 add button stack in the column; editor, picker, and preview open beside the
-bar and clamp to the screen. An icon-less workspace now shows its number
-(`Logic.barName`); before 3.1.1 the full name spilled past the bar.
+bar and clamp to the screen. An icon-less workspace shows its number
+(`Logic.barName`).
 
 Multi-monitor (Hyprland headless output, 3.1.1): each output gets its own bar
-instance with the full widget. Hyprland 0.56 uses Lua dispatchers, so move a
-workspace with `hyprctl dispatch 'hl.dsp.workspace.move({ monitor = "NAME" })'`
-after focusing it; headless outputs are numbered HEADLESS-1, -2, ... per
-session, so read the name from `hyprctl monitors -j`. The hover preview for a
-workspace on the other output used that output's geometry and name
-(HEADLESS-2 · 1920×1080, 16:9). Its window thumbnails rendered black while
-the same workspace previewed fine once moved back to DP-1. The same-output
-control preview showed real content, so this is most likely toplevel export
-on a headless output rather than plugin logic, but it has not been confirmed
-on a second physical monitor. IPC verbs (`openFor`, `preview`) act on the
-first bar instance that registered the handler; only the built-in bar's
-right-click path is per-instance.
+instance. Hyprland 0.56 uses Lua dispatchers, so move a workspace with
+`hyprctl dispatch 'hl.dsp.workspace.move({ monitor = "NAME" })'` after
+focusing it; headless outputs are numbered HEADLESS-1, -2, ... per session.
+The hover preview for a workspace on the other output used that output's
+geometry and name; its window thumbnails rendered black (now covered by the
+map fallback), while the same-output control preview showed content. Likely
+toplevel export on a headless output, unconfirmed on a physical second
+monitor. Since 3.2.0 the IPC verbs route to the bar instance on the focused
+monitor.
 
 ## Future version checklist
 

@@ -398,18 +398,39 @@ Panel {
   }
 
   // Workspace.toplevels can lag or omit sibling surfaces when an application
-  // owns multiple windows. Use Quickshell's complete toplevel registry for
-  // previews and filter by the workspace reported by each client instead.
+  // owns multiple windows. Use Quickshell's complete toplevel registry and
+  // filter by each toplevel's workspace instead.
+  //
+  // A window opened after the shell started has a tracked `workspace`
+  // property straight away, but its `lastIpcObject` is an empty stub until
+  // Quickshell next runs `hyprctl clients`. Prefer the live property and only
+  // fall back to the IPC snapshot.
+  function toplevelWorkspaceId(toplevel) {
+    if (toplevel.workspace && toplevel.workspace.id !== undefined) return Number(toplevel.workspace.id)
+    var ipc = toplevel.lastIpcObject
+    return ipc && ipc.workspace ? Number(ipc.workspace.id) : 0
+  }
+
+  function toplevelAddress(toplevel) {
+    if (toplevel.address) return String(toplevel.address)
+    var ipc = toplevel.lastIpcObject
+    return ipc && ipc.address ? String(ipc.address) : ""
+  }
+
   function toplevelsForWorkspace(id) {
     var out = []
     var values = Hyprland.toplevels.values
     for (var i = 0; i < values.length; i++) {
-      var toplevel = values[i]
-      var ipc = toplevel.lastIpcObject
-      var workspaceId = ipc && ipc.workspace ? ipc.workspace.id : 0
-      if (Number(workspaceId) === Number(id)) out.push(toplevel)
+      if (root.toplevelWorkspaceId(values[i]) === Number(id)) out.push(values[i])
     }
     return out
+  }
+
+  // Geometry, class, and title only arrive with the IPC snapshot, so ask for
+  // one whenever a window appears, moves, or leaves. Cheap: one `hyprctl
+  // clients` per event, and Quickshell coalesces the result.
+  function refreshToplevels() {
+    if (typeof Hyprland.refreshToplevels === "function") Hyprland.refreshToplevels()
   }
 
   function hasWindows(id) {
@@ -541,8 +562,8 @@ Panel {
     var out = []
     var tl = root.toplevelsForWorkspace(focusedWs.id)
     for (var i = 0; i < tl.length; i++) {
-      var o = tl[i].lastIpcObject
-      if (o && o.address) out.push(root.normalizedAddress(o.address))
+      var address = root.toplevelAddress(tl[i])
+      if (address) out.push(root.normalizedAddress(address))
     }
     return out
   }
@@ -551,8 +572,8 @@ Panel {
     if (root.urgentAddresses.length === 0) return false
     var tl = root.toplevelsForWorkspace(id)
     for (var i = 0; i < tl.length; i++) {
-      var o = tl[i].lastIpcObject
-      if (o && o.address && root.urgentAddresses.indexOf(root.normalizedAddress(o.address)) !== -1) return true
+      var address = root.toplevelAddress(tl[i])
+      if (address && root.urgentAddresses.indexOf(root.normalizedAddress(address)) !== -1) return true
     }
     return false
   }
@@ -561,6 +582,10 @@ Panel {
     target: Hyprland
     function onRawEvent(event) {
       var name = String(event.name || "")
+      if (name === "openwindow" || name === "movewindow" || name === "movewindowv2" || name === "closewindow"
+          || name === "changefloatingmode" || name === "fullscreen") {
+        root.refreshToplevels()
+      }
       if (name !== "urgent" && name !== "activewindowv2" && name !== "closewindow") return
       var address = root.normalizedAddress(String(event.data || "").split(",")[0])
       root.urgentAddresses = Logic.urgentAfter(root.urgentAddresses, name, address, root.focusedAddresses())
@@ -751,6 +776,7 @@ Panel {
     // The editor owns the bar's single popout slot; a preview would evict it.
     if (root.opened) return
     if (!root.hasWindows(id)) return
+    root.refreshToplevels()
     root.pendingPreviewId = id
     root.pendingPreviewAnchor = anchor
     previewDelay.restart()
@@ -917,6 +943,7 @@ Panel {
 
   function previewById(n) {
     if (n <= 0 || !root.hasWindows(n)) { root.hidePreview(); return }
+    root.refreshToplevels()
     root.hoverAnchor = grid
     root.hoverPreviewId = n
   }
