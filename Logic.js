@@ -188,8 +188,101 @@ function barName(vertical, icon, name, id) {
   return String(workspaceId(id) || "")
 }
 
+// Hover preview mode. The tri-state `previewMode` setting wins; the older
+// `hoverPreview` boolean only still means "off" when it is false.
+function previewMode(modeValue, legacyHoverPreview) {
+  var mode = String(modeValue === undefined || modeValue === null ? "" : modeValue)
+  if (mode === "capture" || mode === "map" || mode === "off") return mode
+  return legacyHoverPreview === false ? "off" : "capture"
+}
+
+// The most frequent non-empty class; ties go to the one seen first.
+function dominantClass(classes) {
+  var list = Array.isArray(classes) ? classes : []
+  var counts = {}
+  var order = []
+  for (var i = 0; i < list.length; i++) {
+    var cls = String(list[i] || "")
+    if (cls === "") continue
+    if (counts[cls] === undefined) { counts[cls] = 0; order.push(cls) }
+    counts[cls] += 1
+  }
+  var best = ""
+  for (var o = 0; o < order.length; o++) {
+    if (best === "" || counts[order[o]] > counts[best]) best = order[o]
+  }
+  return best
+}
+
+// The icon an unlabeled workspace borrows from what is running on it: the
+// dominant app first, then any app we can identify at all.
+function autoIconFor(classes, entries) {
+  var list = Array.isArray(classes) ? classes : []
+  var lead = dominantClass(list)
+  var rows = lead === "" ? [] : appsForClasses(entries, [lead])
+  if (rows.length === 0) rows = appsForClasses(entries, list)
+  return rows.length > 0 ? "app:" + rows[0].icon : ""
+}
+
+// What the bar paints for a workspace once auto icons and the number
+// fallback are applied. `label` is the stored/default {icon, name}.
+function displayLabel(label, autoIcon, id, autoEnabled) {
+  var icon = label && label.icon !== undefined && label.icon !== null ? String(label.icon) : ""
+  var name = label && label.name !== undefined && label.name !== null ? String(label.name) : ""
+  var auto = false
+  if (icon === "" && autoEnabled !== false && String(autoIcon || "") !== "") {
+    icon = String(autoIcon)
+    auto = true
+  }
+  if (icon === "" && name === "") name = String(workspaceId(id) || id)
+  return { icon: icon, name: name, auto: auto }
+}
+
+// Urgent window bookkeeping driven by Hyprland raw events. `set` is the
+// current sorted list of urgent addresses; the result is a fresh list.
+function urgentAfter(set, eventName, address, focusedAddresses) {
+  var out = Array.isArray(set) ? set.slice() : []
+  var addr = String(address || "")
+  var event = String(eventName || "")
+  function drop(value) {
+    var at = out.indexOf(value)
+    if (at !== -1) out.splice(at, 1)
+  }
+  if (event === "urgent" && addr !== "") {
+    if (out.indexOf(addr) === -1) out.push(addr)
+  } else if ((event === "activewindowv2" || event === "closewindow" || event === "focusedmon") && addr !== "") {
+    drop(addr)
+  }
+  var focused = Array.isArray(focusedAddresses) ? focusedAddresses : []
+  for (var i = 0; i < focused.length; i++) drop(String(focused[i]))
+  out.sort()
+  return out
+}
+
+// Where the sliding focus bar sits: along the bottom edge of the focused
+// button on a horizontal bar, along its right edge on a vertical one.
+function focusGeometry(items, focusedId, vertical, thickness) {
+  var list = Array.isArray(items) ? items : []
+  var t = Math.max(1, Number(thickness) || 1)
+  for (var i = 0; i < list.length; i++) {
+    var item = list[i]
+    if (!item || Number(item.id) !== Number(focusedId)) continue
+    if (vertical) {
+      return { x: item.x + item.width - t, y: item.y, width: t, height: item.height, visible: true }
+    }
+    return { x: item.x, y: item.y + item.height - t, width: item.width, height: t, visible: true }
+  }
+  return { x: 0, y: 0, width: 0, height: 0, visible: false }
+}
+
 if (typeof module !== "undefined") {
   module.exports = {
+    previewMode: previewMode,
+    dominantClass: dominantClass,
+    autoIconFor: autoIconFor,
+    displayLabel: displayLabel,
+    urgentAfter: urgentAfter,
+    focusGeometry: focusGeometry,
     barName: barName,
     appEntryRows: appEntryRows,
     appsForClasses: appsForClasses,

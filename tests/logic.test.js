@@ -198,4 +198,46 @@ assert.equal(Logic.barName(true, "", "Gmail", 5), "5")
 assert.equal(Logic.barName(true, "", "", 12), "12")
 assert.equal(Logic.barName(false, "", "", 5), "")
 
+// Preview mode: the new tri-state setting wins; the legacy boolean maps to off/capture.
+assert.equal(Logic.previewMode("map", true), "map")
+assert.equal(Logic.previewMode("off", true), "off")
+assert.equal(Logic.previewMode("capture", false), "capture")
+assert.equal(Logic.previewMode(undefined, false), "off")
+assert.equal(Logic.previewMode("bogus", undefined), "capture")
+
+// Dominant class: most frequent wins, ties go to first seen, blanks ignored.
+assert.equal(Logic.dominantClass(["a", "b", "b", "", "a", "b"]), "b")
+assert.equal(Logic.dominantClass(["x", "y"]), "x")
+assert.equal(Logic.dominantClass([]), "")
+assert.equal(Logic.dominantClass(null), "")
+
+// Auto icon: an unlabeled workspace borrows its dominant app's icon.
+assert.equal(Logic.autoIconFor(["brave-browser", "Alacritty", "brave-browser"], apps), "app:brave-desktop")
+assert.equal(Logic.autoIconFor(["unknown", "Alacritty"], apps), "app:Alacritty")
+assert.equal(Logic.autoIconFor(["unknown"], apps), "")
+assert.equal(Logic.autoIconFor([], apps), "")
+
+// Display label: auto icon fills an empty icon only when enabled; empty/empty shows the number.
+assert.deepEqual(Logic.displayLabel({icon: "", name: "Web"}, "app:x", 3, true), {icon: "app:x", name: "Web", auto: true})
+assert.deepEqual(Logic.displayLabel({icon: "", name: "Web"}, "app:x", 3, false), {icon: "", name: "Web", auto: false})
+assert.deepEqual(Logic.displayLabel({icon: "\uf0ac", name: ""}, "app:x", 3, true), {icon: "\uf0ac", name: "", auto: false})
+assert.deepEqual(Logic.displayLabel({icon: "", name: ""}, "", 7, true), {icon: "", name: "7", auto: false})
+assert.deepEqual(Logic.displayLabel({icon: "", name: ""}, "app:x", 7, true), {icon: "app:x", name: "", auto: true})
+
+// Urgent bookkeeping from Hyprland raw events.
+assert.deepEqual(Logic.urgentAfter([], "urgent", "0xb", []), ["0xb"])
+assert.deepEqual(Logic.urgentAfter(["0xb"], "urgent", "0xa", []), ["0xa", "0xb"])
+assert.deepEqual(Logic.urgentAfter(["0xa", "0xb"], "activewindowv2", "0xb", []), ["0xa"])
+assert.deepEqual(Logic.urgentAfter(["0xa", "0xb"], "closewindow", "0xa", []), ["0xb"])
+assert.deepEqual(Logic.urgentAfter(["0xa", "0xb"], "tick", "", ["0xa"]), ["0xb"])
+assert.deepEqual(Logic.urgentAfter(["0xa"], "urgent", "", []), ["0xa"])
+assert.deepEqual(Logic.urgentAfter(null, "urgent", "0xa", null), ["0xa"])
+
+// Sliding focus bar geometry.
+const items = [{id: 1, x: 0, y: 0, width: 40, height: 30}, {id: 2, x: 42, y: 0, width: 60, height: 30}]
+assert.deepEqual(Logic.focusGeometry(items, 2, false, 2), {x: 42, y: 28, width: 60, height: 2, visible: true})
+assert.deepEqual(Logic.focusGeometry(items, 1, true, 2), {x: 38, y: 0, width: 2, height: 30, visible: true})
+assert.equal(Logic.focusGeometry(items, 9, false, 2).visible, false)
+assert.equal(Logic.focusGeometry(null, 1, false, 2).visible, false)
+
 console.log("workspace add/remove logic tests passed")
