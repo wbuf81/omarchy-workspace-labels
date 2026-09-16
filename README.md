@@ -3,7 +3,7 @@
 
   <br>
 
-  <a href="https://omarchy.org/"><img src="https://img.shields.io/badge/Omarchy-4.0.2_tested-7aa2f7?style=flat-square" alt="Tested on Omarchy 4.0.2"></a>
+  <a href="https://omarchy.org/"><img src="https://img.shields.io/badge/Omarchy-4.0.3_tested-7aa2f7?style=flat-square" alt="Tested on Omarchy 4.0.3"></a>
   <a href="https://quickshell.org/"><img src="https://img.shields.io/badge/QML-Quickshell-6fe7f2?style=flat-square" alt="Built with QML and Quickshell"></a>
   <a href="https://github.com/wbuf81/omarchy-workspace-labels/actions"><img src="https://img.shields.io/github/actions/workflow/status/wbuf81/omarchy-workspace-labels/ci.yml?style=flat-square&amp;label=checks" alt="Checks status"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-b4f9f8?style=flat-square" alt="MIT license"></a>
@@ -27,11 +27,18 @@ restart after changing a label.
 - **Built from Omarchy's own UI pieces.** The editor uses `Ui.Panel` and
   `Ui.KeyboardPanel`, so it takes real keyboard focus, clamps and scrolls
   inside the screen, and shares the bar's popout slot correctly.
+- **Drawn like a station board.** Flat hairline rules, monospace uppercase
+  captions, zero-padded indices, and a filled square for every workspace that
+  holds windows. Colors, font, spacing, and corner radius all come from your
+  Omarchy theme, so it matches the rest of the shell and its sibling plugin,
+  Idle Screen Counter.
 - **A preview, not a guess.** Hover a workspace to see a scaled map of its
   windows at their actual positions and sizes—even when that workspace is not
   currently visible.
 - **Real app icons.** Use the installed Brave, Spotify, or terminal icon rather
   than an approximation. Apps on the workspace being edited are offered first.
+  Icons come straight from Quickshell's desktop-entry registry, so they work
+  under Omarchy 4.0.3's scoped plugin API.
 - **Fast enough to forget about.** Window captures are single-shot, delayed
   until a deliberate hover, and capped at twelve—not continuously streamed.
 - **Keyboard friendly.** Navigate, rename, choose an icon, add, and remove
@@ -84,7 +91,7 @@ pins. Nothing is written outside that entry.
 
 | Action | Result |
 | --- | --- |
-| Hover a workspace | Preview its windows after ~0.45 seconds |
+| Hover a workspace | Preview its windows after ~0.45 seconds, with window count, monitor, and floating state |
 | Left-click a workspace | Switch to it |
 | Right- or middle-click a workspace | Open the editor on that row |
 | Scroll over the widget | Previous or next visible workspace |
@@ -145,7 +152,8 @@ omarchy webapp install "Gmail" https://mail.google.com/ <icon-url-or-file>
 ```
 
 `icon` also accepts an absolute path such as
-`app:/home/you/icons/thing.png`; paste it into the picker's glyph field.
+`app:/home/you/icons/thing.png`; paste it into the picker's glyph field and
+press **USE**.
 
 ## Settings and scripting
 
@@ -216,8 +224,10 @@ use the copy-and-rescan helper:
 ```
 
 If the shell watcher reports a change but the widget still looks stale, run
-`omarchy restart shell`. The watcher log confirms detection, not necessarily a
-successful live QML reconstruction.
+`omarchy restart shell`. On Omarchy 4.0.3 the watcher logs the reload but keeps
+the previously compiled QML, so a restart is needed after every source edit;
+settings edits still apply live. Let the sync settle for a few seconds before
+restarting.
 
 ## Validate and test
 
@@ -231,7 +241,7 @@ module imported by the QML widget. They run under Node without a compositor.
 
 GitHub Actions runs the portable suite on every push and pull request. The
 native validator and interactive checks intentionally run on an Omarchy
-machine.
+machine. Release 3.1.0 was verified on Omarchy 4.0.3-1.
 
 Before a release, manually sanity-check:
 

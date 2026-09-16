@@ -15,7 +15,7 @@ trap 'rm -rf -- "$scratch_dir"' EXIT
 
 # Frame only real running-plugin captures. The generated background remains an
 # atmospheric layer and never pretends to be application UI.
-magick docs/preview.png -crop 345x245+105+35 +repage -resize 470x \
+magick docs/preview.png -crop 345x215+28+26 +repage -resize 470x \
   -bordercolor '#6fe7f2' -border 2x2 \
   \( +clone -background '#000000' -shadow 70x14+0+16 \) \
   +swap -background none -layers merge +repage \
@@ -38,7 +38,7 @@ magick assets/social/share-card-background.png \
   \( "$scratch_dir/bar.png" -geometry +650+500 \) \
   -compose over -composite \
   -font "$font_file" \
-  -fill '#7aa2f7' -pointsize 18 -draw "text 72,96 'OMARCHY PLUGIN  /  v3.0.1'" \
+  -fill '#7aa2f7' -pointsize 18 -draw "text 72,96 'OMARCHY PLUGIN  /  v3.1.0'" \
   -fill '#f4f7ff' -pointsize 55 -draw "text 70,184 'WORKSPACE' text 70,252 'LABELS'" \
   -fill '#c5ccdc' -pointsize 22 -draw "text 72,315 'Names and real app icons for' text 72,350 'the workspaces you actually use.'" \
   -fill '#6fe7f2' -pointsize 17 -draw "text 72,423 'PREVIEW  •  EDIT  •  SWITCH'" \

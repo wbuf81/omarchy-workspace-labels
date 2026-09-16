@@ -150,4 +150,41 @@ removed.labels["1"].name = "Changed"
 assert.deepEqual(originalPinned, [1, 2, 3])
 assert.equal(labels["1"].name, "Code")
 
+// Desktop entries come straight from Quickshell now; the shell's AppLibrary is
+// withheld from bar-widget plugins on Omarchy 4.0.3. Only visible entries that
+// declare an icon are offered, matched by name, sorted case-insensitively.
+const apps = [
+  {id: "brave-browser", name: "Brave", icon: "brave-desktop", startupClass: "brave-browser", noDisplay: false},
+  {id: "hidden", name: "Hidden", icon: "x", startupClass: "", noDisplay: true},
+  {id: "noicon", name: "No icon", icon: "", startupClass: "", noDisplay: false},
+  {id: "Alacritty", name: "alacritty", icon: "Alacritty", startupClass: "", noDisplay: false},
+  {id: "org.gnome.Nautilus", name: "Files", icon: "org.gnome.Nautilus", startupClass: "", noDisplay: false}
+]
+assert.deepEqual(Logic.appEntryRows(apps, ""), [
+  {id: "Alacritty", icon: "Alacritty", name: "alacritty", wmClass: ""},
+  {id: "brave-browser", icon: "brave-desktop", name: "Brave", wmClass: "brave-browser"},
+  {id: "org.gnome.Nautilus", icon: "org.gnome.Nautilus", name: "Files", wmClass: ""}
+])
+assert.deepEqual(Logic.appEntryRows(apps, "BRA"), [
+  {id: "brave-browser", icon: "brave-desktop", name: "Brave", wmClass: "brave-browser"}
+])
+assert.deepEqual(Logic.appEntryRows(null, "x"), [])
+assert.deepEqual(Logic.appEntryRows([{name: "Broken"}], ""), [])
+
+// A running window's class finds its app through StartupWMClass first, then
+// the desktop id, then the app name. Brave's class is brave-browser while its
+// icon is brave-desktop, so a naive class -> icon lookup would fail. Matches
+// are case-insensitive and deduplicated by icon.
+assert.deepEqual(Logic.appsForClasses(apps, ["BRAVE-BROWSER", "brave-browser", "unknown"]), [
+  {id: "brave-browser", icon: "brave-desktop", name: "Brave", wmClass: "brave-browser"}
+])
+assert.deepEqual(Logic.appsForClasses(apps, ["Alacritty"]), [
+  {id: "Alacritty", icon: "Alacritty", name: "alacritty", wmClass: ""}
+])
+assert.deepEqual(Logic.appsForClasses(apps, ["org.gnome.nautilus"]), [
+  {id: "org.gnome.Nautilus", icon: "org.gnome.Nautilus", name: "Files", wmClass: ""}
+])
+assert.deepEqual(Logic.appsForClasses(apps, []), [])
+assert.deepEqual(Logic.appsForClasses(apps, ["hidden"]), [])
+
 console.log("workspace add/remove logic tests passed")

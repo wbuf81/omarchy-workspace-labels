@@ -5,14 +5,47 @@ easy to lose between sessions; user-facing changes belong in `CHANGELOG.md`.
 
 ## Current state
 
-- Manifest version prepared in this tree: **3.0.1**.
+- Manifest version prepared in this tree: **3.1.0**.
 - Development branch: `main`.
-- Release hardening was performed against **Omarchy 4.0.2-1** on September 1,
-  2026.
-- The repository had one pre-existing uncommitted fix when hardening began:
-  workspace previews and occupancy now use `Hyprland.toplevels` instead of a
-  workspace-local toplevel list that could omit sibling application windows.
-- Confirm the remote GitHub release/tag state before publishing v3.0.1.
+- 3.1.0 was developed and verified against **Omarchy 4.0.3-1** on September
+  16, 2026. 3.0.1 was hardened against 4.0.2-1 on September 1, 2026.
+- The `v3.0.1` tag was created retroactively at the release commit when 3.1.0
+  shipped; earlier the changelog entry existed without a tag.
+
+## Omarchy 4.0.3 plugin API
+
+Third-party bar widgets no longer receive the shell object. `bar.shell` is a
+`PluginShellApi` facade (`/usr/share/omarchy/shell/services/PluginShellApi.qml`,
+built in `shell.qml`). What matters for this plugin:
+
+- `updateEntryInline(id, settings)` still works for the plugin's own layout
+  entry, so settings persistence and the staged-write overlay are unchanged.
+- `appLibrary` is `null` unless the manifest declares the `menu` kind. Version
+  3.1.0 therefore reads `DesktopEntries.applications.values` and resolves icons
+  with `Quickshell.iconPath(name, true)` directly. Do not reintroduce
+  `shell.appLibrary`; `scripts/static-check.sh` fails if it appears.
+- A standalone `qs -p` harness sees zero desktop entries, so test the picker
+  inside the running shell rather than in a throwaway config.
+- The watcher logs "Local plugin changed, reloading" after `dev-sync.sh`, but
+  the compiled QML stays stale until `omarchy restart shell`. Settings changes
+  do apply live. Wait a few seconds after a sync before restarting; a restart
+  during the reload has segfaulted Quickshell in the sibling plugin.
+
+## Design language
+
+The editor, picker, and hover card were redrawn on September 16, 2026 in the
+flat monospace "station board" language shared with Idle Screen Counter (its
+`Panel.qml` is the reference). Keep to it:
+
+- Palette on `root`: `ink` (popup text), `dim` 0.55, `faint` 0.3, `line` 0.14,
+  `well` 0.035, `screenWell` (darker popup background), plus `Color.accent`.
+- `Caption` (uppercase, letter-spaced, dim), `Rule` (1px `line`), and `Mark`
+  (steps(1) blinking accent square) are inline components; reuse them.
+- Rows are separated by `Rule`s, indices are zero-padded via `pad()`, and the
+  keyboard cursor is a `well` fill plus a 2px accent bar at the left edge.
+- Buttons are `bordered` with `fontSize: Style.font.caption` and uppercase
+  text; the primary action is `selected: true`.
+- Honor `Style.cornerRadius` as-is. Never add radius, cards, or friendly copy.
 
 ## Workspace-state contract
 
@@ -42,19 +75,19 @@ omit sibling surfaces when one application owns multiple windows.
 
 ## Verification status
 
-Automated checks completed during the hardening pass:
+Automated checks completed for 3.1.0 on September 16, 2026:
 
-- Node coverage for pinned migration, visible/editor unions, add selection,
-  max capacity, rapid adds, occupied removal protection, unpinned-label
-  removal, malformed IDs, and immutable result state.
+- Node coverage as before, plus desktop-entry filtering, name search, and
+  class-to-app matching (StartupWMClass, then desktop id, then app name).
 - QML parser check with Qt's `qmlformat`.
 - Omarchy's native `omarchy plugin validate`.
-- Manifest, release asset, shell-script, integration-contract, and unresolved
-  marker checks in `scripts/static-check.sh`.
+- Manifest, release asset, shell-script, integration-contract (including the
+  Quickshell desktop-entry path), and unresolved marker checks.
 
-The shell was not running at the beginning of this pass. Before tagging, use
-the README's manual checklist to exercise real clicks, Hyprland dispatch, QML
-focus, screencopy, and config persistence.
+Interactive checks completed on 4.0.3-1 with the shell running: app icons in
+the bar and picker, ON THIS WORKSPACE matching for Ghostty and Brave, the
+redesigned editor, picker, and hover card on a horizontal top bar with one
+monitor. Vertical bars and multi-monitor were not re-exercised for 3.1.0.
 
 ## Future version checklist
 

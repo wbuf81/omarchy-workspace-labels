@@ -7,7 +7,7 @@ cd "$project_dir"
 jq -e '
   .schemaVersion == 1 and
   .id == "io.github.wbuf81.workspace-labels" and
-  .version == "3.0.1" and
+  .version == "3.1.0" and
   .license == "MIT" and
   .kinds == ["bar-widget"] and
   .entryPoints.barWidget == "Workspaces.qml" and
@@ -34,6 +34,14 @@ rg -q 'import "Logic.js" as Logic' Workspaces.qml
 rg -q 'Logic\.addedWorkspaceState' Workspaces.qml
 rg -q 'Logic\.removedWorkspaceState' Workspaces.qml
 rg -q 'Hyprland\.toplevels\.values' Workspaces.qml
+# Omarchy 4.0.3 withholds the shell's AppLibrary from bar-widget plugins, so
+# app icons must come straight from Quickshell's desktop-entry registry.
+rg -q 'DesktopEntries\.applications\.values' Workspaces.qml
+rg -q 'Logic\.appsForClasses' Workspaces.qml
+if rg -q 'shell\.appLibrary' Workspaces.qml; then
+  echo "Static check failed: shell.appLibrary is null for bar widgets on Omarchy 4.0.3" >&2
+  exit 1
+fi
 if rg -q 'workspace\.toplevels\.values|ws\.toplevels\.values' Workspaces.qml; then
   echo "Static check failed: workspace-local toplevel registry reintroduced" >&2
   exit 1

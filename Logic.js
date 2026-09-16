@@ -116,8 +116,73 @@ function removedWorkspaceState(id, editable, occupied, pinnedIds, labels, maximu
   }
 }
 
+// Desktop-entry rows for the icon picker. `entries` are Quickshell
+// DesktopEntry objects (or anything with id/name/icon/startupClass/noDisplay);
+// only visible entries that declare an icon are offered.
+function appEntryRow(entry) {
+  if (!entry || typeof entry !== "object") return null
+  if (entry.noDisplay === true) return null
+  var icon = String(entry.icon || "")
+  if (icon === "") return null
+  return {
+    id: String(entry.id || ""),
+    icon: icon,
+    name: String(entry.name || ""),
+    wmClass: String(entry.startupClass || "")
+  }
+}
+
+function appEntryRows(entries, query) {
+  var list = entries && typeof entries.length === "number" ? entries : []
+  var needle = String(query || "").toLowerCase()
+  var out = []
+  for (var i = 0; i < list.length; i++) {
+    var row = appEntryRow(list[i])
+    if (!row) continue
+    if (needle !== "" && row.name.toLowerCase().indexOf(needle) === -1) continue
+    out.push(row)
+  }
+  out.sort(function(left, right) {
+    var a = left.name.toLowerCase(), b = right.name.toLowerCase()
+    return a < b ? -1 : (a > b ? 1 : 0)
+  })
+  return out
+}
+
+// Which apps are behind a set of running window classes. StartupWMClass is
+// the authoritative link (Brave: class brave-browser, icon brave-desktop); the
+// desktop id and the app name are fallbacks for entries that omit it.
+function appsForClasses(entries, classes) {
+  var rows = appEntryRows(entries, "")
+  var wanted = []
+  var list = Array.isArray(classes) ? classes : []
+  for (var c = 0; c < list.length; c++) {
+    var cls = String(list[c] || "").toLowerCase()
+    if (cls !== "" && wanted.indexOf(cls) === -1) wanted.push(cls)
+  }
+
+  var out = []
+  function push(row) {
+    for (var i = 0; i < out.length; i++) if (out[i].icon === row.icon) return
+    out.push(row)
+  }
+  var keys = ["wmClass", "id", "name"]
+  for (var w = 0; w < wanted.length; w++) {
+    for (var k = 0; k < keys.length; k++) {
+      var matched = false
+      for (var r = 0; r < rows.length; r++) {
+        if (rows[r][keys[k]].toLowerCase() === wanted[w]) { push(rows[r]); matched = true }
+      }
+      if (matched) break
+    }
+  }
+  return out
+}
+
 if (typeof module !== "undefined") {
   module.exports = {
+    appEntryRows: appEntryRows,
+    appsForClasses: appsForClasses,
     workspaceId: workspaceId,
     normalizedPinned: normalizedPinned,
     visibleWorkspaceIds: visibleWorkspaceIds,

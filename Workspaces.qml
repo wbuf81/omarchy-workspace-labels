@@ -107,6 +107,54 @@ Panel {
   readonly property int maxWorkspace: 20
 
   // ---------------------------------------------------------------------
+  // Station palette, in omastorm's spirit: one ink, one dim, one hairline,
+  // the theme accent. The editor and the preview card draw only from these,
+  // so a theme change re-inks the whole surface at once.
+  // ---------------------------------------------------------------------
+  readonly property color ink: Color.popups.text
+  readonly property color dim: Util.alpha(ink, 0.55)
+  readonly property color faint: Util.alpha(ink, 0.3)
+  readonly property color line: Util.alpha(ink, 0.14)
+  readonly property color well: Util.alpha(ink, 0.035)
+  readonly property color screenWell: Qt.darker(Color.popups.background, 1.35)
+  readonly property string panelFont: root.bar ? root.bar.fontFamily : Style.font.family
+
+  function pad(n) { return String(Math.max(0, Number(n) || 0)).padStart(2, "0") }
+
+  component Caption: Text {
+    textFormat: Text.PlainText
+    color: root.dim
+    font.family: root.panelFont
+    font.pixelSize: Style.font.caption
+    font.letterSpacing: 1.4
+    font.capitalization: Font.AllUppercase
+    elide: Text.ElideRight
+  }
+
+  component Rule: Rectangle {
+    width: parent ? parent.width : 0
+    height: 1
+    color: root.line
+  }
+
+  // The status mark from a departure board: steps(1), no easing.
+  component Mark: Rectangle {
+    property bool blinking: false
+    width: Style.space(6)
+    height: width
+    color: Color.accent
+    SequentialAnimation on opacity {
+      running: blinking
+      loops: Animation.Infinite
+      PropertyAction { value: 1 }
+      PauseAnimation { duration: 550 }
+      PropertyAction { value: 0 }
+      PauseAnimation { duration: 550 }
+    }
+    onBlinkingChanged: if (!blinking) opacity = 1
+  }
+
+  // ---------------------------------------------------------------------
   // Settings plumbing
   //
   // updateEntryInline writes shell.json, and the new value only reaches
@@ -234,7 +282,11 @@ Panel {
   // iconSource(class) lookup returns the generic fallback.
   // ---------------------------------------------------------------------
   readonly property string appIconPrefix: "app:"
-  readonly property var appLibrary: (root.bar && root.bar.shell) ? root.bar.shell.appLibrary : null
+
+  // Omarchy 4.0.3 hands bar-widget plugins a scoped shell facade whose
+  // appLibrary is null (only menu plugins get it), so desktop entries and
+  // icon lookups go straight to Quickshell here instead.
+  readonly property var desktopEntries: DesktopEntries.applications.values
 
   function isAppIcon(icon) {
     return String(icon || "").indexOf(root.appIconPrefix) === 0
@@ -244,30 +296,27 @@ Panel {
     return String(icon || "").substring(root.appIconPrefix.length)
   }
 
+  // Mirrors the shell's AppLibrary.iconSource: absolute paths and URLs pass
+  // through, theme names resolve through the icon theme, and anything unknown
+  // falls back to the generic executable icon rather than a blank Image.
   function appIconSource(name) {
-    return root.appLibrary ? root.appLibrary.iconSource(name) : ""
+    var value = String(name || "")
+    if (value === "") return Quickshell.iconPath("application-x-executable", true)
+    if (value.indexOf("file://") === 0 || value.indexOf("image://") === 0) return value
+    if (value.charAt(0) === "/") return Util.fileUrl(value)
+    var themed = Quickshell.iconPath(value, true)
+    if (themed.length > 0) return themed
+    return Quickshell.iconPath("application-x-executable", true)
   }
 
-  // Every installed app, unwrapped from AppLibrary's {entry, score, key, name}
-  // search wrappers, and only those that actually declare an icon.
+  // Every visible installed app that declares an icon, filtered by name.
   function appEntries(query) {
-    if (!root.appLibrary) return []
-    var rows = root.appLibrary.sortedEntries(String(query || ""))
-    var out = []
-    for (var i = 0; i < rows.length; i++) {
-      var e = rows[i] && rows[i].entry ? rows[i].entry : null
-      if (!e || !e.icon) continue
-      out.push({ icon: String(e.icon), name: String(e.name || ""), wmClass: String(e.startupClass || "") })
-    }
-    return out
+    return Logic.appEntryRows(root.desktopEntries, query)
   }
 
   // Apps currently running on a workspace, matched class -> StartupWMClass so
   // the workspace running Brave can be given the actual Brave icon in a click.
   function appsOnWorkspace(id) {
-    var ws = root.workspaceById(id)
-    if (!ws || !root.appLibrary) return []
-
     var classes = []
     var tl = root.toplevelsForWorkspace(id)
     for (var i = 0; i < tl.length; i++) {
@@ -275,20 +324,7 @@ Panel {
       var cls = o ? String(o["class"] || "") : ""
       if (cls && classes.indexOf(cls) === -1) classes.push(cls)
     }
-    if (classes.length === 0) return []
-
-    var all = root.appEntries("")
-    var out = []
-    for (var c = 0; c < classes.length; c++) {
-      var want = classes[c].toLowerCase()
-      for (var a = 0; a < all.length; a++) {
-        var entry = all[a]
-        var sc = entry.wmClass.toLowerCase()
-        if (!sc || sc !== want) continue
-        if (out.filter(function(x) { return x.icon === entry.icon }).length === 0) out.push(entry)
-      }
-    }
-    return out
+    return Logic.appsForClasses(root.desktopEntries, classes)
   }
 
   // Snapshot of the effective labels, so editing one row can't drop the others.
@@ -859,26 +895,65 @@ Panel {
     contentWidth: hoverCard.fittedContentWidth(
       root.previewBoxWidth + hoverCard.horizontalContentInset)
     contentHeight: hoverCard.fittedContentHeight(
-      root.previewBoxHeight + Style.space(6) + previewCaption.implicitHeight)
+      previewHead.height + root.previewBoxHeight + previewFoot.height + Style.space(8) * 2)
+
+    readonly property int floatingCount: {
+      var n = 0
+      for (var i = 0; i < root.previewWindows.length; i++) if (root.previewWindows[i].floating) n++
+      return n
+    }
 
     Column {
       id: previewColumn
       anchors.centerIn: parent
-      spacing: Style.space(6)
+      width: root.previewBoxWidth
+      spacing: Style.space(8)
+
+      // ---------- board header ----------
+      Item {
+        id: previewHead
+        width: parent.width
+        height: Math.max(previewTitle.implicitHeight, previewCount.implicitHeight)
+
+        Mark {
+          id: previewMark
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          width: Style.space(5)
+        }
+        Caption {
+          id: previewTitle
+          anchors.left: previewMark.right
+          anchors.leftMargin: Style.space(7)
+          anchors.right: previewCount.left
+          anchors.rightMargin: Style.space(10)
+          anchors.verticalCenter: parent.verticalCenter
+          color: root.ink
+          font.bold: true
+          text: root.pad(root.hoverPreviewId) + "  " + root.displayFor(root.hoverPreviewId).name
+        }
+        Caption {
+          id: previewCount
+          anchors.right: parent.right
+          anchors.verticalCenter: parent.verticalCenter
+          text: {
+            var n = root.previewWindows.length
+            return n + (n === 1 ? " window" : " windows")
+          }
+        }
+      }
 
       // Stands in for the monitor. Everything inside is positioned in real
       // Hyprland coordinates scaled by `sx`, so relative sizes and positions
       // survive.
       Rectangle {
         id: screenRect
-        width: root.previewBoxWidth
+        width: parent.width
         height: root.previewBoxHeight
-        implicitWidth: width
-        implicitHeight: height
         radius: Style.cornerRadius
-        color: Qt.alpha(Color.popups.text, 0.05)
+        color: root.screenWell
         border.width: 1
-        border.color: Qt.alpha(Color.popups.text, 0.14)
+        border.color: root.line
         clip: true
 
         readonly property real sx: root.previewMonitor && root.previewMonitor.width > 0
@@ -897,11 +972,10 @@ Panel {
             y: Math.round((winRect.modelData.ay - screenRect.originY) * screenRect.sx)
             width: Math.max(3, Math.round(winRect.modelData.aw * screenRect.sx))
             height: Math.max(3, Math.round(winRect.modelData.ah * screenRect.sx))
-
             color: Color.popups.background
             border.width: 1
-            border.color: Qt.alpha(Color.popups.text, winRect.modelData.floating ? 0.45 : 0.22)
-            radius: 2
+            border.color: Util.alpha(root.ink, winRect.modelData.floating ? 0.45 : 0.22)
+            radius: 0
             clip: true
 
             ScreencopyView {
@@ -915,18 +989,28 @@ Panel {
         }
       }
 
-      Text {
-        id: previewCaption
-        width: screenRect.width
-        elide: Text.ElideRight
-        text: {
-          var label = root.displayFor(root.hoverPreviewId)
-          var n = root.previewWindows.length
-          return label.name + "  ·  " + n + (n === 1 ? " window" : " windows")
+      // ---------- board footer ----------
+      Item {
+        id: previewFoot
+        width: parent.width
+        height: Math.max(previewMonitorText.implicitHeight, previewFloating.implicitHeight)
+
+        Caption {
+          id: previewMonitorText
+          anchors.left: parent.left
+          anchors.right: previewFloating.left
+          anchors.rightMargin: Style.space(10)
+          anchors.verticalCenter: parent.verticalCenter
+          text: root.previewMonitor
+            ? String(root.previewMonitor.name || "") + "  ·  " + root.previewMonitor.width + "×" + root.previewMonitor.height
+            : ""
         }
-        color: Qt.darker(Color.popups.text, 1.3)
-        font.family: root.bar ? root.bar.fontFamily : Style.font.family
-        font.pixelSize: Style.font.caption
+        Caption {
+          id: previewFloating
+          anchors.right: parent.right
+          anchors.verticalCenter: parent.verticalCenter
+          text: hoverCard.floatingCount > 0 ? hoverCard.floatingCount + " floating" : "tiled"
+        }
       }
     }
   }
@@ -934,6 +1018,13 @@ Panel {
   // ---------------------------------------------------------------------
   // Editor panel
   // ---------------------------------------------------------------------
+  readonly property int liveCount: {
+    var ids = root.workspaceIds()
+    var n = 0
+    for (var i = 0; i < ids.length; i++) if (root.hasWindows(ids[i])) n++
+    return n
+  }
+
   KeyboardPanel {
     id: panel
     anchorItem: grid
@@ -941,8 +1032,8 @@ Panel {
     bar: root.bar
     open: root.opened
     focusTarget: keyCatcher
-    contentWidth: panel.fittedContentWidth(Style.space(400))
-    contentHeight: panel.fittedContentHeight(panelColumn.implicitHeight, Style.space(560))
+    contentWidth: panel.fittedContentWidth(Style.space(420))
+    contentHeight: panel.fittedContentHeight(panelColumn.implicitHeight, Style.space(600))
 
     PanelKeyCatcher {
       id: keyCatcher
@@ -976,210 +1067,260 @@ Panel {
         Column {
           id: panelColumn
           width: scrollArea.availableWidth
-          spacing: Style.space(14)
+          spacing: Style.space(12)
 
-          // ---------- Hero ----------
+          // ---------- station row ----------
           Item {
             width: parent.width
-            implicitHeight: Math.max(heroIcon.implicitHeight, heroLabels.implicitHeight)
+            height: Math.max(stationLeft.implicitHeight, stationStatus.implicitHeight, Style.space(22))
 
-            // Holds either a glyph or an app icon image — an app icon stored as
-            // "app:brave-desktop" must not be painted as that literal string.
-            Item {
-              id: heroIcon
+            Row {
+              id: stationLeft
               anchors.left: parent.left
               anchors.verticalCenter: parent.verticalCenter
-              readonly property string current: root.showPicker ? root.labelFor(root.pickerFor).icon : ""
-              readonly property bool isApp: root.isAppIcon(heroIcon.current)
+              spacing: Style.space(8)
 
-              width: heroImage.visible ? heroImage.width : (heroGlyph.visible ? heroGlyph.implicitWidth : 0)
-              height: heroImage.visible ? heroImage.height : (heroGlyph.visible ? heroGlyph.implicitHeight : 0)
-              implicitWidth: width
-              implicitHeight: height
-
-              Text {
-                id: heroGlyph
-                anchors.centerIn: parent
-                visible: !heroIcon.isApp && heroIcon.current !== ""
-                text: heroIcon.current
-                textFormat: Text.PlainText
-                color: Color.popups.text
-                font.family: root.bar ? root.bar.fontFamily : Style.font.family
-                font.pixelSize: Style.font.display
+              // In the picker the mark gives way to the icon being edited,
+              // which may be a glyph or an app image.
+              Mark {
+                visible: !root.showPicker
+                anchors.verticalCenter: parent.verticalCenter
+                blinking: root.opened && !root.showPicker
               }
 
-              Image {
-                id: heroImage
-                anchors.centerIn: parent
-                visible: heroIcon.isApp
-                width: visible ? Style.font.display : 0
+              Item {
+                id: heroIcon
+                visible: root.showPicker
+                anchors.verticalCenter: parent.verticalCenter
+                readonly property string current: root.showPicker ? root.labelFor(root.pickerFor).icon : ""
+                readonly property bool isApp: root.isAppIcon(heroIcon.current)
+                width: visible ? Style.space(22) : 0
                 height: width
-                fillMode: Image.PreserveAspectFit
-                sourceSize.width: Math.max(1, width * Screen.devicePixelRatio)
-                sourceSize.height: Math.max(1, height * Screen.devicePixelRatio)
-                source: heroIcon.isApp ? root.appIconSource(root.appIconName(heroIcon.current)) : ""
-                asynchronous: true
+
+                Text {
+                  anchors.centerIn: parent
+                  visible: !heroIcon.isApp
+                  text: heroIcon.current !== "" ? heroIcon.current : "—"
+                  textFormat: Text.PlainText
+                  color: root.ink
+                  font.family: root.panelFont
+                  font.pixelSize: Style.font.title
+                }
+
+                Image {
+                  anchors.fill: parent
+                  visible: heroIcon.isApp
+                  fillMode: Image.PreserveAspectFit
+                  sourceSize.width: Math.max(1, width * Screen.devicePixelRatio)
+                  sourceSize.height: Math.max(1, height * Screen.devicePixelRatio)
+                  source: heroIcon.isApp ? root.appIconSource(root.appIconName(heroIcon.current)) : ""
+                  asynchronous: true
+                }
+              }
+
+              Text {
+                anchors.verticalCenter: parent.verticalCenter
+                text: root.showPicker ? "CHOOSE ICON" : "WORKSPACES"
+                textFormat: Text.PlainText
+                color: root.ink
+                font.family: root.panelFont
+                font.pixelSize: Style.font.title
+                font.bold: true
+                font.letterSpacing: 1.8
               }
             }
 
-            Column {
-              id: heroLabels
-              anchors.left: heroIcon.right
-              anchors.leftMargin: Style.space(14)
+            Caption {
+              id: stationStatus
+              anchors.left: stationLeft.right
+              anchors.leftMargin: Style.space(12)
               anchors.right: parent.right
               anchors.verticalCenter: parent.verticalCenter
-              spacing: Style.space(2)
-
-              Text {
-                text: root.showPicker ? "Choose icon" : "Workspaces"
-                color: Color.popups.text
-                font.family: root.bar ? root.bar.fontFamily : Style.font.family
-                font.pixelSize: Style.font.title
-                font.bold: true
-                elide: Text.ElideRight
-                width: parent.width
-              }
-
-              Text {
-                text: root.showPicker
-                  ? ("WORKSPACE " + root.pickerFor + "  ·  "
-                     + (root.filteredIcons.length + root.filteredApps.length) + " ICONS")
-                  : (root.editableIds().length + " WORKSPACES  ·  RIGHT-CLICK TO EDIT")
-                color: Qt.darker(Color.popups.text, 1.4)
-                font.family: root.bar ? root.bar.fontFamily : Style.font.family
-                font.pixelSize: Style.font.caption
-                font.bold: true
-                font.letterSpacing: 1.2
-                elide: Text.ElideRight
-                width: parent.width
-              }
+              horizontalAlignment: Text.AlignRight
+              elide: Text.ElideMiddle
+              text: root.showPicker
+                ? "workspace " + root.pad(root.pickerFor) + "  ·  "
+                  + (root.workspaceApps.length + root.filteredIcons.length + root.filteredApps.length) + " icons"
+                : root.pad(root.editableIds().length) + " rows  ·  " + root.pad(root.liveCount) + " live"
             }
           }
 
-          PanelSeparator { width: parent.width; foreground: Color.popups.text }
+          Rule {}
 
-          // ---------- List view ----------
-          PanelSectionHeader {
+          // ---------- labels ----------
+          Item {
             visible: !root.showPicker
-            text: "LABELS"
-            foreground: Color.popups.text
-            fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
+            width: parent.width
+            height: labelsHeader.implicitHeight
+
+            PanelSectionHeader {
+              id: labelsHeader
+              anchors.left: parent.left
+              text: "LABELS"
+              foreground: root.ink
+              fontFamily: root.panelFont
+            }
+            Caption {
+              anchors.right: parent.right
+              anchors.baseline: labelsHeader.baseline
+              text: {
+                var focusedWs = Hyprland.focusedWorkspace
+                return focusedWs ? "now  " + root.pad(focusedWs.id) + "  " + root.displayFor(focusedWs.id).name : ""
+              }
+            }
           }
 
           Column {
             width: parent.width
             visible: !root.showPicker
-            spacing: Style.space(4)
+            spacing: 0
 
             Repeater {
               model: root.editableIds()
 
-              Rectangle {
+              Column {
                 id: editRow
                 required property int modelData
+                required property int index
                 readonly property var wsLabel: root.labelFor(editRow.modelData)
                 readonly property bool targeted: root.editorTarget === editRow.modelData
-                readonly property bool live: root.hasWindows(editRow.modelData)
-
+                readonly property int windows: root.toplevelsForWorkspace(editRow.modelData).length
+                readonly property bool live: editRow.windows > 0
+                readonly property bool focusedWs: Hyprland.focusedWorkspace !== null && Hyprland.focusedWorkspace.id === editRow.modelData
                 width: parent.width
-                height: rowLayout.implicitHeight + Style.space(8)
-                radius: Style.cornerRadius
-                color: editRow.targeted ? Qt.alpha(Color.popups.text, 0.10) : "transparent"
 
-                RowLayout {
-                  id: rowLayout
-                  anchors.left: parent.left
-                  anchors.right: parent.right
-                  anchors.leftMargin: Style.space(6)
-                  anchors.rightMargin: Style.space(6)
-                  anchors.verticalCenter: parent.verticalCenter
-                  spacing: Style.space(8)
+                Rule { visible: editRow.index > 0; opacity: 0.7 }
 
-                  Text {
-                    text: String(editRow.modelData)
-                    color: Qt.darker(Color.popups.text, 1.5)
-                    Layout.preferredWidth: Style.space(12)
-                    font.family: root.bar ? root.bar.fontFamily : Style.font.family
-                    font.pixelSize: Style.font.bodySmall
-                    font.bold: true
+                Rectangle {
+                  width: parent.width
+                  height: rowLayout.implicitHeight + Style.space(10)
+                  radius: Style.cornerRadius
+                  color: editRow.targeted ? root.well : "transparent"
+
+                  // The keyboard cursor: a hairline of accent down the left edge.
+                  Rectangle {
+                    visible: editRow.targeted
+                    anchors.left: parent.left
+                    anchors.top: parent.top
+                    anchors.bottom: parent.bottom
+                    width: Style.space(2)
+                    color: Color.accent
                   }
 
-                  // Opens the inline picker rather than a nested dropdown -
-                  // a QQC.Popup inside this panel would be clipped by the
-                  // ScrollView and could not take keyboard focus.
-                  PanelActionButton {
-                    readonly property bool usesApp: root.isAppIcon(editRow.wsLabel.icon)
-                    iconText: usesApp ? "" : (editRow.wsLabel.icon !== "" ? editRow.wsLabel.icon : "—")
-                    tooltipText: "Choose icon for workspace " + editRow.modelData
-                    bordered: true
-                    foreground: Color.popups.text
-                    fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
-                    onClicked: root.openPicker(editRow.modelData)
+                  RowLayout {
+                    id: rowLayout
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.leftMargin: Style.space(10)
+                    anchors.rightMargin: Style.space(4)
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: Style.space(8)
 
-                    Image {
-                      visible: parent.usesApp
-                      anchors.centerIn: parent
-                      width: Style.space(17)
-                      height: width
-                      fillMode: Image.PreserveAspectFit
-                      sourceSize.width: Math.max(1, width * Screen.devicePixelRatio)
-                      sourceSize.height: Math.max(1, height * Screen.devicePixelRatio)
-                      source: parent.usesApp
-                        ? root.appIconSource(root.appIconName(editRow.wsLabel.icon)) : ""
-                      asynchronous: true
+                    // Live mark: filled while the workspace holds windows,
+                    // an outline when it is only a reserved slot.
+                    Rectangle {
+                      Layout.preferredWidth: Style.space(6)
+                      Layout.preferredHeight: Style.space(6)
+                      color: editRow.live ? (editRow.focusedWs ? Color.accent : root.ink) : "transparent"
+                      border.width: editRow.live ? 0 : 1
+                      border.color: root.faint
                     }
-                  }
 
-                  TextField {
-                    id: nameField
-                    Layout.fillWidth: true
-                    height: Style.spacing.controlHeight
-                    text: editRow.wsLabel.name
-                    placeholderText: "name"
-                    foreground: Color.popups.text
-                    font.family: root.bar ? root.bar.fontFamily : Style.font.family
-                    onEditingFinished: root.setName(editRow.modelData, text)
-                    onAccepted: { root.setName(editRow.modelData, text); keyCatcher.forceActiveFocus() }
-                    Keys.onEscapePressed: function(event) { root.escapeFrom(); event.accepted = true }
-                    onActiveFocusChanged: root.noteFieldFocus(activeFocus)
-                    Component.onDestruction: if (activeFocus) root.noteFieldFocus(false)
+                    Caption {
+                      Layout.preferredWidth: Style.space(18)
+                      text: root.pad(editRow.modelData)
+                      color: editRow.targeted ? Color.accent : (editRow.focusedWs ? root.ink : root.dim)
+                      font.bold: true
+                      font.letterSpacing: 0.6
+                    }
 
-                    // Opening from a right-click (or from "+") drops the
-                    // cursor straight into that workspace's name.
-                    function grabIfTargeted() {
-                      if (!root.autoFocusTarget) return
-                      if (root.opened && !root.showPicker && editRow.targeted) {
-                        root.autoFocusTarget = false
-                        nameField.forceActiveFocus()
+                    // Opens the inline picker rather than a nested dropdown -
+                    // a QQC.Popup inside this panel would be clipped by the
+                    // ScrollView and could not take keyboard focus.
+                    PanelActionButton {
+                      readonly property bool usesApp: root.isAppIcon(editRow.wsLabel.icon)
+                      iconText: usesApp ? "" : (editRow.wsLabel.icon !== "" ? editRow.wsLabel.icon : "—")
+                      tooltipText: "Choose icon for workspace " + editRow.modelData
+                      bordered: true
+                      foreground: root.ink
+                      fontFamily: root.panelFont
+                      onClicked: root.openPicker(editRow.modelData)
+
+                      Image {
+                        visible: parent.usesApp
+                        anchors.centerIn: parent
+                        width: Style.space(17)
+                        height: width
+                        fillMode: Image.PreserveAspectFit
+                        sourceSize.width: Math.max(1, width * Screen.devicePixelRatio)
+                        sourceSize.height: Math.max(1, height * Screen.devicePixelRatio)
+                        source: parent.usesApp
+                          ? root.appIconSource(root.appIconName(editRow.wsLabel.icon)) : ""
+                        asynchronous: true
                       }
                     }
 
-                    Component.onCompleted: Qt.callLater(nameField.grabIfTargeted)
+                    TextField {
+                      id: nameField
+                      Layout.fillWidth: true
+                      height: Style.spacing.controlHeight
+                      text: editRow.wsLabel.name
+                      placeholderText: "name"
+                      foreground: root.ink
+                      font.family: root.panelFont
+                      onEditingFinished: root.setName(editRow.modelData, text)
+                      onAccepted: { root.setName(editRow.modelData, text); keyCatcher.forceActiveFocus() }
+                      Keys.onEscapePressed: function(event) { root.escapeFrom(); event.accepted = true }
+                      onActiveFocusChanged: root.noteFieldFocus(activeFocus)
+                      Component.onDestruction: if (activeFocus) root.noteFieldFocus(false)
 
-                    Connections {
-                      target: root
-                      function onEditorTargetChanged() { Qt.callLater(nameField.grabIfTargeted) }
-                      function onOpenedChanged() { Qt.callLater(nameField.grabIfTargeted) }
-                      function onAutoFocusTargetChanged() { Qt.callLater(nameField.grabIfTargeted) }
+                      // Opening from a right-click (or from "+") drops the
+                      // cursor straight into that workspace's name.
+                      function grabIfTargeted() {
+                        if (!root.autoFocusTarget) return
+                        if (root.opened && !root.showPicker && editRow.targeted) {
+                          root.autoFocusTarget = false
+                          nameField.forceActiveFocus()
+                        }
+                      }
+
+                      Component.onCompleted: Qt.callLater(nameField.grabIfTargeted)
+
+                      Connections {
+                        target: root
+                        function onEditorTargetChanged() { Qt.callLater(nameField.grabIfTargeted) }
+                        function onOpenedChanged() { Qt.callLater(nameField.grabIfTargeted) }
+                        function onAutoFocusTargetChanged() { Qt.callLater(nameField.grabIfTargeted) }
+                      }
                     }
-                  }
 
-                  PanelActionButton {
-                    iconText: "×"
-                    tooltipText: editRow.live
-                      ? "Workspace " + editRow.modelData + " still has windows"
-                      : "Remove workspace " + editRow.modelData
-                    foreground: Color.popups.text
-                    opacity: editRow.live ? 0.25 : 0.8
-                    fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
-                    onClicked: root.removeWorkspace(editRow.modelData)
+                    Caption {
+                      Layout.preferredWidth: Style.space(64)
+                      horizontalAlignment: Text.AlignRight
+                      font.letterSpacing: 0.6
+                      text: editRow.live
+                        ? editRow.windows + (editRow.windows === 1 ? " window" : " windows")
+                        : "empty"
+                      color: editRow.live ? root.dim : root.faint
+                    }
+
+                    PanelActionButton {
+                      iconText: "×"
+                      tooltipText: editRow.live
+                        ? "Workspace " + editRow.modelData + " still has windows"
+                        : "Remove workspace " + editRow.modelData
+                      foreground: root.ink
+                      opacity: editRow.live ? 0.25 : 0.8
+                      fontFamily: root.panelFont
+                      onClicked: root.removeWorkspace(editRow.modelData)
+                    }
                   }
                 }
               }
             }
           }
 
-          // ---------- Icon picker view ----------
+          // ---------- icon picker ----------
           Column {
             width: parent.width
             visible: root.showPicker
@@ -1191,8 +1332,8 @@ Panel {
               height: Style.spacing.controlHeight
               text: root.iconQuery
               placeholderText: "Search icons…"
-              foreground: Color.popups.text
-              font.family: root.bar ? root.bar.fontFamily : Style.font.family
+              foreground: root.ink
+              font.family: root.panelFont
               onTextChanged: root.iconQuery = text
               Keys.onEscapePressed: function(event) { root.escapeFrom(); event.accepted = true }
               onActiveFocusChanged: root.noteFieldFocus(activeFocus)
@@ -1204,11 +1345,18 @@ Panel {
             }
 
             // Apps running on this workspace, resolved class -> StartupWMClass.
-            PanelSectionHeader {
+            Item {
               visible: root.workspaceApps.length > 0
-              text: "ON THIS WORKSPACE"
-              foreground: Color.popups.text
-              fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
+              width: parent.width
+              height: onWorkspaceHeader.implicitHeight
+              PanelSectionHeader {
+                id: onWorkspaceHeader
+                anchors.left: parent.left
+                text: "ON THIS WORKSPACE"
+                foreground: root.ink
+                fontFamily: root.panelFont
+              }
+              Caption { anchors.right: parent.right; anchors.baseline: onWorkspaceHeader.baseline; text: root.pad(root.workspaceApps.length) }
             }
 
             Flow {
@@ -1221,10 +1369,11 @@ Panel {
 
                 PanelActionButton {
                   required property var modelData
+                  readonly property bool selected: root.labelFor(root.pickerFor).icon === root.appIconPrefix + modelData.icon
                   iconText: ""
                   tooltipText: modelData.name
-                  bordered: root.labelFor(root.pickerFor).icon === root.appIconPrefix + modelData.icon
-                  foreground: Color.popups.text
+                  bordered: true
+                  foreground: selected ? Color.accent : root.ink
                   onClicked: root.chooseIcon(root.appIconPrefix + modelData.icon)
 
                   Image {
@@ -1241,11 +1390,18 @@ Panel {
               }
             }
 
-            PanelSectionHeader {
+            Item {
               visible: root.filteredIcons.length > 0
-              text: "GLYPHS"
-              foreground: Color.popups.text
-              fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
+              width: parent.width
+              height: glyphHeader.implicitHeight
+              PanelSectionHeader {
+                id: glyphHeader
+                anchors.left: parent.left
+                text: "GLYPHS"
+                foreground: root.ink
+                fontFamily: root.panelFont
+              }
+              Caption { anchors.right: parent.right; anchors.baseline: glyphHeader.baseline; text: root.pad(root.filteredIcons.length) }
             }
 
             Flow {
@@ -1257,22 +1413,30 @@ Panel {
 
                 PanelActionButton {
                   required property var modelData
+                  readonly property bool selected: root.labelFor(root.pickerFor).icon === modelData.value
                   iconText: modelData.value !== "" ? modelData.value : "—"
                   tooltipText: String(modelData.label).replace(modelData.value, "").trim()
                     + "   " + modelData.description
-                  bordered: root.labelFor(root.pickerFor).icon === modelData.value
-                  foreground: Color.popups.text
-                  fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
+                  bordered: true
+                  foreground: selected ? Color.accent : root.ink
+                  fontFamily: root.panelFont
                   onClicked: root.chooseIcon(modelData.value)
                 }
               }
             }
 
-            PanelSectionHeader {
+            Item {
               visible: root.filteredApps.length > 0
-              text: "APPS"
-              foreground: Color.popups.text
-              fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
+              width: parent.width
+              height: appsHeader.implicitHeight
+              PanelSectionHeader {
+                id: appsHeader
+                anchors.left: parent.left
+                text: "APPS"
+                foreground: root.ink
+                fontFamily: root.panelFont
+              }
+              Caption { anchors.right: parent.right; anchors.baseline: appsHeader.baseline; text: root.pad(root.filteredApps.length) }
             }
 
             Flow {
@@ -1285,10 +1449,11 @@ Panel {
 
                 PanelActionButton {
                   required property var modelData
+                  readonly property bool selected: root.labelFor(root.pickerFor).icon === root.appIconPrefix + modelData.icon
                   iconText: ""
                   tooltipText: modelData.name
-                  bordered: root.labelFor(root.pickerFor).icon === root.appIconPrefix + modelData.icon
-                  foreground: Color.popups.text
+                  bordered: true
+                  foreground: selected ? Color.accent : root.ink
                   onClicked: root.chooseIcon(root.appIconPrefix + modelData.icon)
 
                   Image {
@@ -1305,95 +1470,133 @@ Panel {
               }
             }
 
-            Text {
+            Caption {
               width: parent.width
               visible: root.filteredIcons.length === 0 && root.filteredApps.length === 0
-              text: "No matching icons. Paste any glyph below instead."
-              color: Qt.darker(Color.popups.text, 1.4)
-              wrapMode: Text.WordWrap
-              font.family: root.bar ? root.bar.fontFamily : Style.font.family
-              font.pixelSize: Style.font.caption
+              text: "No matching icons  ·  paste any glyph below"
             }
 
-            RowLayout {
+            Rule {}
+
+            Item {
               width: parent.width
-              spacing: Style.space(8)
+              height: Math.max(glyphNote.implicitHeight, pickerButtons.implicitHeight)
 
-              TextField {
-                id: customGlyph
-                Layout.preferredWidth: Style.space(70)
-                height: Style.spacing.controlHeight
-                placeholderText: "glyph"
-                horizontalAlignment: Text.AlignHCenter
-                foreground: Color.popups.text
-                font.family: root.bar ? root.bar.fontFamily : Style.font.family
-                onAccepted: root.chooseIcon(text)
-                Keys.onEscapePressed: function(event) { root.escapeFrom(); event.accepted = true }
-                onActiveFocusChanged: root.noteFieldFocus(activeFocus)
-                Component.onDestruction: if (activeFocus) root.noteFieldFocus(false)
+              Caption {
+                id: glyphNote
+                anchors.left: parent.left
+                anchors.right: pickerButtons.left
+                anchors.rightMargin: Style.space(12)
+                anchors.verticalCenter: parent.verticalCenter
+                text: "Any glyph"
               }
 
-              Button {
-                text: "Use glyph"
-                bordered: true
-                foreground: Color.popups.text
-                fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
-                onClicked: root.chooseIcon(customGlyph.text)
-              }
+              Row {
+                id: pickerButtons
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: Style.space(6)
 
-              Item { Layout.fillWidth: true }
+                TextField {
+                  id: customGlyph
+                  width: Style.space(64)
+                  height: Style.spacing.controlHeight
+                  anchors.verticalCenter: parent.verticalCenter
+                  placeholderText: "glyph"
+                  horizontalAlignment: Text.AlignHCenter
+                  foreground: root.ink
+                  font.family: root.panelFont
+                  onAccepted: root.chooseIcon(text)
+                  Keys.onEscapePressed: function(event) { root.escapeFrom(); event.accepted = true }
+                  onActiveFocusChanged: root.noteFieldFocus(activeFocus)
+                  Component.onDestruction: if (activeFocus) root.noteFieldFocus(false)
+                }
 
-              Button {
-                text: "Back"
-                bordered: true
-                foreground: Color.popups.text
-                fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
-                onClicked: root.closePicker()
+                Button {
+                  anchors.verticalCenter: parent.verticalCenter
+                  text: "USE"
+                  bordered: true
+                  selected: true
+                  foreground: root.ink
+                  accent: Color.accent
+                  fontFamily: root.panelFont
+                  fontSize: Style.font.caption
+                  onClicked: root.chooseIcon(customGlyph.text)
+                }
+
+                Button {
+                  anchors.verticalCenter: parent.verticalCenter
+                  text: "BACK"
+                  iconText: "󰁍"
+                  bordered: true
+                  foreground: root.ink
+                  accent: Color.accent
+                  fontFamily: root.panelFont
+                  fontSize: Style.font.caption
+                  onClicked: root.closePicker()
+                }
               }
             }
           }
 
-          PanelSeparator {
-            width: parent.width
-            visible: !root.showPicker
-            foreground: Color.popups.text
-          }
+          // ---------- footer ----------
+          Rule { visible: !root.showPicker }
 
-          Text {
-            width: parent.width
+          Caption {
             visible: !root.showPicker
-            text: "j/k move  ·  enter rename  ·  i icon  ·  a add  ·  x remove  ·  esc close"
-            color: Qt.darker(Color.popups.text, 1.6)
+            width: parent.width
+            font.letterSpacing: 0.8
+            elide: Text.ElideNone
             wrapMode: Text.WordWrap
-            font.family: root.bar ? root.bar.fontFamily : Style.font.family
-            font.pixelSize: Style.font.caption
+            lineHeight: 1.35
+            text: "j/k move  ·  enter rename  ·  i icon\na add  ·  x remove  ·  esc close"
           }
 
-          RowLayout {
-            width: parent.width
+          Item {
             visible: !root.showPicker
-            spacing: Style.space(8)
+            width: parent.width
+            height: Math.max(footNote.implicitHeight, footButtons.implicitHeight)
 
-            Button {
-              text: root.canAdd ? "Add workspace " + root.nextFreeId() : "All slots used"
-              iconText: "+"
-              bordered: true
-              enabled: root.canAdd
-              opacity: root.canAdd ? 1 : 0.4
-              foreground: Color.popups.text
-              fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
-              onClicked: root.addWorkspace()
+            Caption {
+              id: footNote
+              anchors.left: parent.left
+              anchors.right: footButtons.left
+              anchors.rightMargin: Style.space(12)
+              anchors.verticalCenter: parent.verticalCenter
+              text: root.canAdd
+                ? "slot " + root.pad(root.nextFreeId()) + " free  ·  " + root.maxWorkspace + " max"
+                : "all " + root.maxWorkspace + " slots used"
             }
 
-            Item { Layout.fillWidth: true }
+            Row {
+              id: footButtons
+              anchors.right: parent.right
+              anchors.verticalCenter: parent.verticalCenter
+              spacing: Style.space(6)
 
-            Button {
-              id: resetButton
-              text: "Reset"
-              bordered: true
-              foreground: Color.popups.text
-              fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
-              onClicked: root.resetLabels()
+              Button {
+                text: "RESET"
+                bordered: true
+                foreground: root.ink
+                accent: Color.accent
+                fontFamily: root.panelFont
+                fontSize: Style.font.caption
+                onClicked: root.resetLabels()
+              }
+
+              Button {
+                text: root.canAdd ? "ADD " + root.pad(root.nextFreeId()) : "FULL"
+                iconText: "+"
+                bordered: true
+                selected: true
+                enabled: root.canAdd
+                opacity: root.canAdd ? 1 : 0.4
+                foreground: root.ink
+                accent: Color.accent
+                fontFamily: root.panelFont
+                fontSize: Style.font.caption
+                onClicked: root.addWorkspace()
+              }
             }
           }
         }

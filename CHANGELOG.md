@@ -1,5 +1,26 @@
 # Changelog
 
+## 3.1.0
+
+- **App icons work again on Omarchy 4.0.3.** The 4.0.3 shell hands bar-widget
+  plugins a scoped API whose app library is empty, which left every
+  `app:<icon>` label as a blank gap and hid the picker's APPS and ON THIS
+  WORKSPACE sections. Desktop entries and icon lookups now go straight to
+  Quickshell, and the class-to-app matching lives in the tested logic module
+  with StartupWMClass first, then the desktop id, then the app name.
+- **Station-board redesign** of the editor, icon picker, and hover preview in
+  the flat monospace language shared with Idle Screen Counter: a header with a
+  blinking mark and a live readout, hairline rules instead of separators,
+  zero-padded row indices with a filled square for workspaces that hold
+  windows, per-row window counts, uppercase letter-spaced captions, and
+  bordered caption-size buttons in a footer row. Corner radius follows the
+  theme as-is.
+- The hover preview card now names the workspace, counts its windows, and
+  reports the monitor it maps and whether anything floats.
+- Picker sections show their counts, and the hero shows the icon being edited.
+- Static checks pin the Quickshell desktop-entry path and fail if the shell's
+  app library is reintroduced. Tested platform badge moved to Omarchy 4.0.3.
+
 ## 3.0.1
 
 - Workspace occupancy, app matching, and hover previews now use Quickshell's
