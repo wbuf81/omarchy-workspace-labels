@@ -5,7 +5,7 @@
   "version": "3.1.1",
   "author": "Wes (wbuf81)",
   "license": "MIT",
-  "description": "Named workspaces with per-workspace icons \u2014 Nerd Font glyphs or real app icons \u2014 hover previews, and a + to add or remove workspaces.",
+  "description": "Named workspaces with per-workspace icons — Nerd Font glyphs or real app icons — hover previews, and a + to add or remove workspaces.",
   "kinds": [
     "bar-widget"
   ],
@@ -41,23 +41,23 @@
     "defaults": {
       "labels": {
         "1": {
-          "icon": "\udb81\udea9",
+          "icon": "󰚩",
           "name": "Code"
         },
         "2": {
-          "icon": "\uf015",
+          "icon": "",
           "name": "Home"
         },
         "3": {
-          "icon": "\uf0ac",
+          "icon": "",
           "name": "Web"
         },
         "4": {
-          "icon": "\uf099",
+          "icon": "",
           "name": "X"
         },
         "5": {
-          "icon": "\uf0e0",
+          "icon": "",
           "name": "Gmail"
         }
       },
@@ -68,7 +68,9 @@
         4,
         5
       ],
-      "hoverPreview": true
+      "hoverPreview": true,
+      "previewMode": "capture",
+      "autoIcons": true
     },
     "schema": [
       {
@@ -78,10 +80,29 @@
         "description": "Map of workspace number -> {icon, name}. `icon` is a literal glyph, or \"app:<icon-name>\" to use an installed application's icon (e.g. \"app:brave-desktop\"). Edited by right-clicking the widget, or `omarchy bar set io.github.wbuf81.workspace-labels labels '<json>' --json`."
       },
       {
+        "key": "previewMode",
+        "type": "string",
+        "label": "Hover preview",
+        "description": "capture shows a single-shot screenshot of every window on the workspace; map draws each window as a block with its app icon and never shows screen content; off disables the preview. Suppressed while the editor is open.",
+        "defaultValue": "capture",
+        "options": [
+          "capture",
+          "map",
+          "off"
+        ]
+      },
+      {
+        "key": "autoIcons",
+        "type": "boolean",
+        "label": "Auto icons",
+        "description": "A workspace without an icon shows the icon of the app running on it, chosen by the most common window class. Turn off to leave icon-less workspaces bare.",
+        "defaultValue": true
+      },
+      {
         "key": "hoverPreview",
         "type": "boolean",
-        "label": "Hover previews",
-        "description": "Hovering a workspace shows thumbnails of the windows on it. Captured once per hover via Hyprland toplevel export, not a live feed. Suppressed while the editor panel is open.",
+        "label": "Hover previews (legacy)",
+        "description": "Superseded by `previewMode`. Only consulted while `previewMode` is unset: false turns previews off.",
         "defaultValue": true
       },
       {

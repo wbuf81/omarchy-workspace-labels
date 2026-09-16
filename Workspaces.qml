@@ -227,13 +227,29 @@ Panel {
     return { icon: icon, name: name }
   }
 
-  // What the bar paints. WidgetButton hides itself when its text is empty, so
-  // a workspace with both fields cleared would otherwise become an invisible,
-  // unclickable gap - fall back to the number instead.
+  // What the bar paints. An icon-less workspace borrows the icon of the app
+  // running on it (auto icons), and a workspace with both fields empty falls
+  // back to its number so the button never becomes an invisible gap.
+  readonly property bool autoIcons: root.effSetting("autoIcons", true) !== false
+
   function displayFor(id) {
-    var label = root.labelFor(id)
-    if (label.icon === "" && label.name === "") return { icon: "", name: String(id) }
-    return label
+    return Logic.displayLabel(root.labelFor(id), root.autoIcons ? root.autoIconFor(id) : "", id, root.autoIcons)
+  }
+
+  // Unique window classes currently on a workspace.
+  function classesOn(id) {
+    var classes = []
+    var tl = root.toplevelsForWorkspace(id)
+    for (var i = 0; i < tl.length; i++) {
+      var o = tl[i].lastIpcObject
+      var cls = o ? String(o["class"] || "") : ""
+      if (cls) classes.push(cls)
+    }
+    return classes
+  }
+
+  function autoIconFor(id) {
+    return Logic.autoIconFor(root.classesOn(id), root.desktopEntries)
   }
 
   // ---------------------------------------------------------------------
@@ -276,22 +292,29 @@ Panel {
     return Quickshell.iconPath("application-x-executable", true)
   }
 
-  // Every visible installed app that declares an icon, filtered by name.
+  // Every visible installed app whose icon actually resolves, filtered by
+  // name. An entry naming an icon no theme provides would only ever paint the
+  // generic executable fallback, so it is left out of the picker.
   function appEntries(query) {
-    return Logic.appEntryRows(root.desktopEntries, query)
+    var rows = Logic.appEntryRows(root.desktopEntries, query)
+    var out = []
+    for (var i = 0; i < rows.length; i++) {
+      var icon = rows[i].icon
+      if (icon.charAt(0) === "/" || Quickshell.iconPath(icon, true) !== "") out.push(rows[i])
+    }
+    return out
+  }
+
+  // The icon behind one window class, for badges in the preview.
+  function iconForClass(cls) {
+    var rows = Logic.appsForClasses(root.desktopEntries, [String(cls || "")])
+    return rows.length > 0 ? rows[0].icon : ""
   }
 
   // Apps currently running on a workspace, matched class -> StartupWMClass so
   // the workspace running Brave can be given the actual Brave icon in a click.
   function appsOnWorkspace(id) {
-    var classes = []
-    var tl = root.toplevelsForWorkspace(id)
-    for (var i = 0; i < tl.length; i++) {
-      var o = tl[i].lastIpcObject
-      var cls = o ? String(o["class"] || "") : ""
-      if (cls && classes.indexOf(cls) === -1) classes.push(cls)
-    }
-    return Logic.appsForClasses(root.desktopEntries, classes)
+    return Logic.appsForClasses(root.desktopEntries, root.classesOn(id))
   }
 
   // Snapshot of the effective labels, so editing one row can't drop the others.
@@ -492,6 +515,62 @@ Panel {
     root.bar.run("hyprctl dispatch " + Util.shellQuote("hl.dsp.focus({ workspace = \"" + id + "\" })"))
   }
 
+  // Middle-click: send the focused window to that workspace without following.
+  function sendFocusedWindow(id) {
+    if (!root.bar || Number(id) <= 0) return
+    root.bar.run("hyprctl dispatch " + Util.shellQuote("hl.dsp.window.move({ workspace = \"" + id + "\", follow = false })"))
+  }
+
+  // ---------------------------------------------------------------------
+  // Urgent windows
+  //
+  // Hyprland announces urgency only as a raw IPC event carrying the window
+  // address, so the set is kept here and cleared as soon as the window is
+  // activated, closed, or its workspace is focused.
+  // ---------------------------------------------------------------------
+  property var urgentAddresses: []
+
+  function normalizedAddress(value) {
+    var s = String(value || "").trim().toLowerCase()
+    return s.indexOf("0x") === 0 ? s.substring(2) : s
+  }
+
+  function focusedAddresses() {
+    var focusedWs = Hyprland.focusedWorkspace
+    if (!focusedWs) return []
+    var out = []
+    var tl = root.toplevelsForWorkspace(focusedWs.id)
+    for (var i = 0; i < tl.length; i++) {
+      var o = tl[i].lastIpcObject
+      if (o && o.address) out.push(root.normalizedAddress(o.address))
+    }
+    return out
+  }
+
+  function isUrgent(id) {
+    if (root.urgentAddresses.length === 0) return false
+    var tl = root.toplevelsForWorkspace(id)
+    for (var i = 0; i < tl.length; i++) {
+      var o = tl[i].lastIpcObject
+      if (o && o.address && root.urgentAddresses.indexOf(root.normalizedAddress(o.address)) !== -1) return true
+    }
+    return false
+  }
+
+  Connections {
+    target: Hyprland
+    function onRawEvent(event) {
+      var name = String(event.name || "")
+      if (name !== "urgent" && name !== "activewindowv2" && name !== "closewindow") return
+      var address = root.normalizedAddress(String(event.data || "").split(",")[0])
+      root.urgentAddresses = Logic.urgentAfter(root.urgentAddresses, name, address, root.focusedAddresses())
+    }
+    function onFocusedWorkspaceChanged() {
+      if (root.urgentAddresses.length > 0)
+        root.urgentAddresses = Logic.urgentAfter(root.urgentAddresses, "", "", root.focusedAddresses())
+    }
+  }
+
   // ---------------------------------------------------------------------
   // Editor lifecycle
   //
@@ -605,7 +684,11 @@ Panel {
   // feed: a live capture per window is far too expensive for something that
   // appears whenever the pointer crosses the bar.
   // ---------------------------------------------------------------------
-  readonly property bool hoverPreviewEnabled: String(root.effSetting("hoverPreview", true)) !== "false"
+  // capture | map | off. `map` draws blocks with app icons and never shows
+  // screen content; it is also what a tile falls back to when a capture
+  // yields nothing.
+  readonly property string previewMode: Logic.previewMode(
+    root.effSetting("previewMode", undefined), root.effSetting("hoverPreview", undefined))
   property int hoverPreviewId: 0
   property int pendingPreviewId: 0
   property Item hoverAnchor: null
@@ -652,7 +735,9 @@ Panel {
         toplevel: all[i],
         ax: o.at[0], ay: o.at[1],
         aw: o.size[0], ah: o.size[1],
-        floating: !!o.floating
+        floating: !!o.floating,
+        cls: String(o["class"] || ""),
+        title: String(o.title || "")
       })
     }
     out.sort(function(a, b) { return (a.floating ? 1 : 0) - (b.floating ? 1 : 0) })
@@ -662,7 +747,7 @@ Panel {
   }
 
   function requestPreview(id, anchor) {
-    if (!root.hoverPreviewEnabled) return
+    if (root.previewMode === "off") return
     // The editor owns the bar's single popout slot; a preview would evict it.
     if (root.opened) return
     if (!root.hasWindows(id)) return
@@ -784,26 +869,47 @@ Panel {
   //   omarchy-shell io.github.wbuf81.workspace-labels openFor 3
   //   omarchy-shell io.github.wbuf81.workspace-labels add
   //   omarchy-shell io.github.wbuf81.workspace-labels remove 6
+  // Only the first bar instance's handler is registered, so on a multi-monitor
+  // setup it forwards to the instance whose bar sits on the focused monitor,
+  // matching what a right-click on that bar would do.
+  function instanceOnFocusedMonitor() {
+    var monitor = Hyprland.focusedMonitor ? String(Hyprland.focusedMonitor.name || "") : ""
+    var items = root.bar && typeof root.bar.moduleWidgets === "function"
+      ? root.bar.moduleWidgets(root.moduleName) : []
+    for (var i = 0; i < items.length; i++) {
+      var item = items[i]
+      var window = item && item.grid ? item.grid.QsWindow.window : null
+      if (window && window.screen && String(window.screen.name || "") === monitor) return item
+    }
+    return root
+  }
+
+  function previewById(n) {
+    if (n <= 0 || !root.hasWindows(n)) { root.hidePreview(); return }
+    root.hoverAnchor = grid
+    root.hoverPreviewId = n
+  }
+
   IpcHandler {
     target: "io.github.wbuf81.workspace-labels"
 
-    function toggleEditor(): void { root.toggle() }
-    function toggle(): void { root.toggle() }
-    function open(): void { root.controller.show() }
-    function close(): void { root.close() }
-    function openFor(id: string): void { root.openFor(parseInt(id, 10) || 0, false) }
-    function picker(id: string): void { root.openPicker(parseInt(id, 10) || 0); root.controller.show() }
+    function toggleEditor(): void { root.instanceOnFocusedMonitor().toggle() }
+    function toggle(): void { root.instanceOnFocusedMonitor().toggle() }
+    function open(): void { root.instanceOnFocusedMonitor().controller.show() }
+    function close(): void { root.instanceOnFocusedMonitor().close() }
+    function openFor(id: string): void { root.instanceOnFocusedMonitor().openFor(parseInt(id, 10) || 0, false) }
+    function picker(id: string): void {
+      var target = root.instanceOnFocusedMonitor()
+      target.openPicker(parseInt(id, 10) || 0)
+      target.controller.show()
+    }
     function add(): void { root.addWorkspace() }
     function reset(): void { root.resetLabels() }
-    function preview(id: string): void {
-      var n = parseInt(id, 10) || 0
-      if (n <= 0 || !root.hasWindows(n)) { root.hidePreview(); return }
-      root.hoverAnchor = grid
-      root.hoverPreviewId = n
-    }
-    function unpreview(): void { root.hidePreview() }
+    function preview(id: string): void { root.instanceOnFocusedMonitor().previewById(parseInt(id, 10) || 0) }
+    function unpreview(): void { root.instanceOnFocusedMonitor().hidePreview() }
     function next(): void { root.cycleWorkspace(1) }
     function prev(): void { root.cycleWorkspace(-1) }
     function remove(id: string): void { root.removeWorkspace(parseInt(id, 10) || 0) }
+    function send(id: string): void { root.sendFocusedWindow(parseInt(id, 10) || 0) }
   }
 }

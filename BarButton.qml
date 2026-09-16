@@ -15,6 +15,9 @@ WidgetButton {
 
   readonly property bool occupied: host.hasWindows(workspaceId)
   readonly property bool focused: Hyprland.focusedWorkspace !== null && Hyprland.focusedWorkspace.id === workspaceId
+  readonly property bool urgent: host.isUrgent(workspaceId)
+  // Urgent borrows the bar's own urgent color; everything else is plain ink.
+  readonly property color inkColor: urgent ? button.activeColor : button.foreground
 
   // Named wsLabel, not label: WidgetButton already has an internal `label`
   // item and a plain `label` property would shadow it.
@@ -55,7 +58,7 @@ WidgetButton {
       text: button.wsLabel.icon
       textFormat: Text.PlainText
       anchors.verticalCenter: parent.verticalCenter
-      color: button.foreground
+      color: button.inkColor
       font.family: button.fontFamily
       font.pixelSize: button.fontSize
       renderType: Text.NativeRendering
@@ -72,19 +75,20 @@ WidgetButton {
       textFormat: Text.PlainText
       font.underline: button.focused
       anchors.verticalCenter: parent.verticalCenter
-      color: button.foreground
+      color: button.inkColor
       font.family: button.fontFamily
       font.pixelSize: button.fontSize
       renderType: Text.NativeRendering
     }
   }
 
-  tooltipText: button.wsLabel.name + "  —  right-click to edit"
-  opacity: button.occupied || button.focused ? 1 : 0.5
+  tooltipText: button.wsLabel.name + "  —  right-click to edit, middle-click to send the focused window here"
+  opacity: button.occupied || button.focused || button.urgent ? 1 : 0.5
   horizontalMargin: 6
   verticalPadding: 6
   onPressed: function(mouseButton) {
-    if (mouseButton === Qt.RightButton || mouseButton === Qt.MiddleButton) host.openFor(button.workspaceId, false)
+    if (mouseButton === Qt.RightButton) host.openFor(button.workspaceId, false)
+    else if (mouseButton === Qt.MiddleButton) host.sendFocusedWindow(button.workspaceId)
     else host.focusWorkspace(button.workspaceId)
   }
   onWheelMoved: function(delta) { host.handleWheel(delta) }

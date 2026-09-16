@@ -216,10 +216,16 @@ KeyboardPanel {
                     font.letterSpacing: 0.6
                   }
 
+                  // Shows the effective icon: a chosen one at full strength, an
+                  // auto icon borrowed from the running app dimmed, so the row
+                  // says what the bar paints and whether it was your choice.
                   PanelActionButton {
-                    readonly property bool usesApp: host.isAppIcon(editRow.wsLabel.icon)
-                    iconText: usesApp ? "" : (editRow.wsLabel.icon !== "" ? editRow.wsLabel.icon : "—")
-                    tooltipText: "Choose icon for workspace " + editRow.modelData
+                    readonly property var shown: host.displayFor(editRow.modelData)
+                    readonly property bool usesApp: host.isAppIcon(shown.icon)
+                    iconText: usesApp ? "" : (shown.icon !== "" ? shown.icon : "—")
+                    tooltipText: shown.auto
+                      ? "Auto icon from what is running here  ·  click to choose your own"
+                      : "Choose icon for workspace " + editRow.modelData
                     bordered: true
                     foreground: host.ink
                     fontFamily: host.panelFont
@@ -230,10 +236,11 @@ KeyboardPanel {
                       anchors.centerIn: parent
                       width: Style.space(17)
                       height: width
+                      opacity: parent.shown.auto ? 0.55 : 1
                       fillMode: Image.PreserveAspectFit
                       sourceSize.width: Math.max(1, width * Screen.devicePixelRatio)
                       sourceSize.height: Math.max(1, height * Screen.devicePixelRatio)
-                      source: parent.usesApp ? host.appIconSource(host.appIconName(editRow.wsLabel.icon)) : ""
+                      source: parent.usesApp ? host.appIconSource(host.appIconName(parent.shown.icon)) : ""
                       asynchronous: true
                     }
                   }

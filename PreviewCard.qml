@@ -99,6 +99,7 @@ PopupCard {
           sx: screenRect.sx
           originX: screenRect.originX
           originY: screenRect.originY
+          mode: card.host.previewMode
         }
       }
     }
