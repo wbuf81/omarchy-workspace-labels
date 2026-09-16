@@ -7,7 +7,7 @@ cd "$project_dir"
 jq -e '
   .schemaVersion == 1 and
   .id == "io.github.wbuf81.workspace-labels" and
-  .version == "3.1.0" and
+  .version == "3.1.1" and
   .license == "MIT" and
   .kinds == ["bar-widget"] and
   .entryPoints.barWidget == "Workspaces.qml" and
@@ -38,6 +38,7 @@ rg -q 'Hyprland\.toplevels\.values' Workspaces.qml
 # app icons must come straight from Quickshell's desktop-entry registry.
 rg -q 'DesktopEntries\.applications\.values' Workspaces.qml
 rg -q 'Logic\.appsForClasses' Workspaces.qml
+rg -q 'Logic\.barName' Workspaces.qml
 if rg -q 'shell\.appLibrary' Workspaces.qml; then
   echo "Static check failed: shell.appLibrary is null for bar widgets on Omarchy 4.0.3" >&2
   exit 1
@@ -61,7 +62,7 @@ if [[ -n $qmlformat_bin ]]; then
 fi
 
 if rg -n '(^|[^[:alpha:]])(TODO|FIXME|HACK)([^[:alpha:]]|$)' \
-  --glob '*.qml' --glob '*.js' --glob '*.sh' --glob '!scripts/static-check.sh'; then
+  --glob '*.qml' --glob '*.js' --glob '*.sh' --glob '!scripts/static-check.sh' .; then
   echo "Static check failed: unresolved marker" >&2
   exit 1
 fi

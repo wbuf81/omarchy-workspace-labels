@@ -5,10 +5,10 @@ easy to lose between sessions; user-facing changes belong in `CHANGELOG.md`.
 
 ## Current state
 
-- Manifest version prepared in this tree: **3.1.0**.
+- Manifest version prepared in this tree: **3.1.1**.
 - Development branch: `main`.
-- 3.1.0 was developed and verified against **Omarchy 4.0.3-1** on September
-  16, 2026. 3.0.1 was hardened against 4.0.2-1 on September 1, 2026.
+- 3.1.0 and 3.1.1 were developed and verified against **Omarchy 4.0.3-1** on
+  September 16, 2026. 3.0.1 was hardened against 4.0.2-1 on September 1, 2026.
 - The `v3.0.1` tag was created retroactively at the release commit when 3.1.0
   shipped; earlier the changelog entry existed without a tag.
 
@@ -86,8 +86,26 @@ Automated checks completed for 3.1.0 on September 16, 2026:
 
 Interactive checks completed on 4.0.3-1 with the shell running: app icons in
 the bar and picker, ON THIS WORKSPACE matching for Ghostty and Brave, the
-redesigned editor, picker, and hover card on a horizontal top bar with one
-monitor. Vertical bars and multi-monitor were not re-exercised for 3.1.0.
+redesigned editor, picker, and hover card on a horizontal top bar.
+
+Vertical bar (`omarchy bar position left`, 3.1.1): app icons, glyphs, and the
+add button stack in the column; editor, picker, and preview open beside the
+bar and clamp to the screen. An icon-less workspace now shows its number
+(`Logic.barName`); before 3.1.1 the full name spilled past the bar.
+
+Multi-monitor (Hyprland headless output, 3.1.1): each output gets its own bar
+instance with the full widget. Hyprland 0.56 uses Lua dispatchers, so move a
+workspace with `hyprctl dispatch 'hl.dsp.workspace.move({ monitor = "NAME" })'`
+after focusing it; headless outputs are numbered HEADLESS-1, -2, ... per
+session, so read the name from `hyprctl monitors -j`. The hover preview for a
+workspace on the other output used that output's geometry and name
+(HEADLESS-2 · 1920×1080, 16:9). Its window thumbnails rendered black while
+the same workspace previewed fine once moved back to DP-1. The same-output
+control preview showed real content, so this is most likely toplevel export
+on a headless output rather than plugin logic, but it has not been confirmed
+on a second physical monitor. IPC verbs (`openFor`, `preview`) act on the
+first bar instance that registered the handler; only the built-in bar's
+right-click path is per-instance.
 
 ## Future version checklist
 

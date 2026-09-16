@@ -817,11 +817,12 @@ Panel {
 
           Text {
             id: nameText
-            // On a vertical bar only the icon fits; fall back to the name
-            // when there is no icon at all, so the button is never blank.
-            visible: wsButton.wsLabel.name !== ""
-              && (!root.vertical || (!wsButton.usesAppIcon && wsButton.wsLabel.icon === ""))
-            text: wsButton.wsLabel.name
+            // On a vertical bar only the icon fits. A workspace with no icon
+            // falls back to its number there, the way the stock widget paints
+            // every workspace; a full name would spill past the bar's width.
+            // The tooltip still carries the name.
+            visible: nameText.text !== ""
+            text: Logic.barName(root.vertical, wsButton.wsLabel.icon, wsButton.wsLabel.name, wsButton.modelData)
             textFormat: Text.PlainText
             font.underline: wsButton.focused
             anchors.verticalCenter: parent.verticalCenter
@@ -1277,7 +1278,10 @@ Panel {
                       // Opening from a right-click (or from "+") drops the
                       // cursor straight into that workspace's name.
                       function grabIfTargeted() {
-                        if (!root.autoFocusTarget) return
+                        // Deferred through Qt.callLater, so the bar may have
+                        // torn this row down (monitor or position change)
+                        // before it runs.
+                        if (!root || !root.autoFocusTarget) return
                         if (root.opened && !root.showPicker && editRow.targeted) {
                           root.autoFocusTarget = false
                           nameField.forceActiveFocus()

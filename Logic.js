@@ -179,8 +179,18 @@ function appsForClasses(entries, classes) {
   return out
 }
 
+// What the bar paints beside a workspace's icon. A vertical bar is one glyph
+// wide, so the name is dropped when there is an icon and replaced by the
+// number when there is not; a full name would spill past the bar.
+function barName(vertical, icon, name, id) {
+  if (!vertical) return String(name || "")
+  if (String(icon || "") !== "") return ""
+  return String(workspaceId(id) || "")
+}
+
 if (typeof module !== "undefined") {
   module.exports = {
+    barName: barName,
     appEntryRows: appEntryRows,
     appsForClasses: appsForClasses,
     workspaceId: workspaceId,

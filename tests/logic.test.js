@@ -187,4 +187,15 @@ assert.deepEqual(Logic.appsForClasses(apps, ["org.gnome.nautilus"]), [
 assert.deepEqual(Logic.appsForClasses(apps, []), [])
 assert.deepEqual(Logic.appsForClasses(apps, ["hidden"]), [])
 
+// A vertical bar has room for one glyph per workspace. With an icon the name
+// is dropped; without one the number stands in, the way the stock widget
+// paints every workspace. Horizontal bars always show the name.
+assert.equal(Logic.barName(false, "", "Gmail", 5), "Gmail")
+assert.equal(Logic.barName(false, "\uf0e0", "Gmail", 5), "Gmail")
+assert.equal(Logic.barName(true, "\uf0e0", "Gmail", 5), "")
+assert.equal(Logic.barName(true, "app:brave-origin", "Brave", 2), "")
+assert.equal(Logic.barName(true, "", "Gmail", 5), "5")
+assert.equal(Logic.barName(true, "", "", 12), "12")
+assert.equal(Logic.barName(false, "", "", 5), "")
+
 console.log("workspace add/remove logic tests passed")

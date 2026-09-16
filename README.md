@@ -44,7 +44,8 @@ restart after changing a label.
 - **Keyboard friendly.** Navigate, rename, choose an icon, add, and remove
   without leaving the home row.
 - **Theme and layout aware.** Horizontal bars show icon and name; vertical bars
-  collapse naturally to an icon-first column.
+  collapse to an icon-only column, and a workspace without an icon shows its
+  number there so nothing spills past the bar.
 - **State stays local.** Labels and pins live only in this widget's existing
   `shell.json` layout entry. No service, database, or state directory is added.
 

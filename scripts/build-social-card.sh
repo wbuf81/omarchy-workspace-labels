@@ -38,7 +38,7 @@ magick assets/social/share-card-background.png \
   \( "$scratch_dir/bar.png" -geometry +650+500 \) \
   -compose over -composite \
   -font "$font_file" \
-  -fill '#7aa2f7' -pointsize 18 -draw "text 72,96 'OMARCHY PLUGIN  /  v3.1.0'" \
+  -fill '#7aa2f7' -pointsize 18 -draw "text 72,96 'OMARCHY PLUGIN  /  v3.1.1'" \
   -fill '#f4f7ff' -pointsize 55 -draw "text 70,184 'WORKSPACE' text 70,252 'LABELS'" \
   -fill '#c5ccdc' -pointsize 22 -draw "text 72,315 'Names and real app icons for' text 72,350 'the workspaces you actually use.'" \
   -fill '#6fe7f2' -pointsize 17 -draw "text 72,423 'PREVIEW  •  EDIT  •  SWITCH'" \

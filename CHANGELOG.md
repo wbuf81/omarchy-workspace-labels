@@ -1,5 +1,19 @@
 # Changelog
 
+## 3.1.1
+
+- Vertical bars: a workspace with a name but no icon showed the whole name
+  horizontally and spilled past the bar. It now shows its number, like the
+  stock widget; the tooltip keeps the name. The rule lives in `Logic.barName`
+  with tests.
+- Silenced a harmless `autoFocusTarget of undefined` warning fired by a
+  deferred focus grab after the bar tore its rows down during a monitor or
+  bar-position change.
+- Verified on Omarchy 4.0.3-1 with the bar on the left edge and with a second
+  (headless) Hyprland output: each output gets its own bar instance, and the
+  hover preview maps a workspace on the other monitor with that monitor's
+  geometry.
+
 ## 3.1.0
 
 - **App icons work again on Omarchy 4.0.3.** The 4.0.3 shell hands bar-widget
